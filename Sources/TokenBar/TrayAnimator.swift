@@ -50,21 +50,51 @@ final class TrayAnimator {
             }
     }
 
+    private var defaultsObserver: NSObjectProtocol?
+
     func start() {
         startAnimationLoop()
         startLoadPolling()
         startQuotaPolling()
+        // Re-render the gauge the moment a setting changes (style, coloring,
+        // quota source) — the 2s loop alone reads as a laggy beat.
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.renderGaugeIcon() }
+        }
     }
 
     func stop() {
         animationTask?.cancel()
         loadTask?.cancel()
         quotaTask?.cancel()
+        if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
     }
+
+    /// Draws the current gauge style immediately (no-op for cat/parrot,
+    /// whose frames the animation loop owns).
+    private func renderGaugeIcon() {
+        let style = UserDefaults.standard.string(forKey: Self.styleKey) ?? "cat"
+        guard let gaugeStyle = QuotaIconStyle(rawValue: style) else { return }
+        let coloring = IconColoring(
+            rawValue: UserDefaults.standard.string(forKey: IconColoring.storageKey) ?? ""
+        ) ?? .warningOnly
+        controller?.setFrame(
+            TrayIcons.image(
+                style: gaugeStyle, remaining: quotaRemaining,
+                dark: controller?.isDarkAppearance ?? true,
+                coloring: coloring))
+    }
+
+    private static let lastRemainingKey = "tokenbar.quota.lastRemaining"
 
     /// Last successfully resolved remaining percent — a transient fetch
     /// failure (or a provider erroring) must never zero/blank the display.
-    private var cachedQuotaRemaining: Double?
+    /// Persisted so a relaunch shows the last reading immediately instead of
+    /// a blank gauge while the first (network) fetch runs.
+    private var cachedQuotaRemaining: Double? =
+        UserDefaults.standard.object(forKey: lastRemainingKey) as? Double
 
     /// The selected quota window's remaining percent, holding the last good
     /// value across failed refreshes (nil only before any data ever arrived).
@@ -74,7 +104,10 @@ final class TrayAnimator {
         if let value = QuotaResolver.resolve(payload: quota, selection: selection)?
             .window.remainingPercent
         {
-            cachedQuotaRemaining = value
+            if value != cachedQuotaRemaining {
+                cachedQuotaRemaining = value
+                UserDefaults.standard.set(value, forKey: Self.lastRemainingKey)
+            }
             return value
         }
         return cachedQuotaRemaining
@@ -105,17 +138,10 @@ final class TrayAnimator {
             while !Task.isCancelled {
                 guard let self else { break }
                 let style = UserDefaults.standard.string(forKey: Self.styleKey) ?? "cat"
-                // Gauge styles: redraw from the latest quota every couple of
-                // seconds (cheap vector image; also tracks appearance flips).
-                if let gaugeStyle = QuotaIconStyle(rawValue: style) {
-                    let coloring = IconColoring(
-                        rawValue: UserDefaults.standard.string(forKey: IconColoring.storageKey) ?? ""
-                    ) ?? .warningOnly
-                    self.controller?.setFrame(
-                        TrayIcons.image(
-                            style: gaugeStyle, remaining: self.quotaRemaining,
-                            dark: self.controller?.isDarkAppearance ?? true,
-                            coloring: coloring))
+                // Gauge styles: instant renders happen on settings/quota
+                // changes; this loop just tracks appearance flips.
+                if QuotaIconStyle(rawValue: style) != nil {
+                    self.renderGaugeIcon()
                     try? await Task.sleep(for: .seconds(2))
                     continue
                 }
@@ -153,6 +179,7 @@ final class TrayAnimator {
                 guard let self, !Task.isCancelled else { break }
                 if let payload {
                     self.quota = payload
+                    self.renderGaugeIcon()
                     self.onQuotaUpdated?()
                 }
                 try? await Task.sleep(for: .seconds(300))
