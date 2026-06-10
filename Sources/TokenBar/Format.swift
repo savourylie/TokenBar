@@ -67,4 +67,14 @@ enum Format {
     static func exactTokens(_ count: Int64) -> String {
         count.formatted(.number.grouping(.automatic).locale(Locale(identifier: "en_US")))
     }
+
+    /// Compact "time ago" from a Unix-seconds timestamp: "just now", "5m ago",
+    /// "3h ago", "2d ago". Used for the pricing-data freshness hint.
+    static func relativeTime(_ epochSecs: UInt64, now: Date = Date()) -> String {
+        let diff = max(0, Int(now.timeIntervalSince1970) - Int(epochSecs))
+        if diff < 60 { return "just now" }
+        if diff < 3600 { return "\(diff / 60)m ago" }
+        if diff < 86400 { return "\(diff / 3600)h ago" }
+        return "\(diff / 86400)d ago"
+    }
 }

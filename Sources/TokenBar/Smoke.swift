@@ -41,7 +41,8 @@ enum Smoke {
             let report = try TBCore.modelReport()
             let top = report.entries.max(by: { $0.cost < $1.cost })
             return "\(report.entries.count) models, \(report.totalMessages) messages, "
-                + "top=\(top.map { "\($0.model) ($\(String(format: "%.2f", $0.cost)))" } ?? "none")"
+                + "top=\(top.map { "\($0.model) ($\(String(format: "%.2f", $0.cost)))" } ?? "none"), "
+                + "pricesUpdated=\(report.pricingUpdatedAt.map(String.init) ?? "nil")"
         }
 
         summarize("hourly") {

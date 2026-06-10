@@ -27,4 +27,7 @@ public struct ModelReport: Decodable, Sendable {
     public let totalCacheWrite: Int64
     public let totalMessages: Int
     public let totalCost: Double
+    /// Unix-seconds time the LiteLLM pricing dataset was last fetched
+    /// (drives the "Prices updated …" hint). Absent before the first fetch.
+    public let pricingUpdatedAt: UInt64?
 }

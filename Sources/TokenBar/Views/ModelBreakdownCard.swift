@@ -32,9 +32,16 @@ struct ModelBreakdownCard: View {
         DashCard(
             title,
             trailing: {
-                Text("\(rows.count) model\(rows.count == 1 ? "" : "s") · \(Format.usd(totalCost))")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text("\(rows.count) model\(rows.count == 1 ? "" : "s") · \(Format.usd(totalCost))")
+                        .foregroundStyle(.secondary)
+                    if let updatedAt = report?.pricingUpdatedAt {
+                        Text("Prices updated \(Format.relativeTime(updatedAt))")
+                            .foregroundStyle(.tertiary)
+                            .help("LiteLLM pricing data; refreshes automatically about once an hour")
+                    }
+                }
+                .font(.caption2)
             }
         ) {
             if rows.isEmpty {
