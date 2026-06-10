@@ -98,17 +98,13 @@ struct PopoverView: View {
                 DailyView(payload: payload, colors: model.colors)
             case .hourly:
                 HourlyView(report: model.hourly)
-            case .stats, .agents:
-                placeholder(activeView.wrappedValue)
+            case .stats:
+                StatsView(
+                    payload: payload, stats: stats,
+                    modelReport: model.modelReport, colors: model.colors)
+            case .agents:
+                AgentsView(report: model.agents)
             }
-        }
-    }
-
-    private func placeholder(_ view: AppView) -> some View {
-        DashCard(view.label) {
-            Text("Coming soon — this lens is being ported.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
