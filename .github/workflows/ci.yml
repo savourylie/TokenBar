@@ -22,4 +22,4 @@ jobs:
         run: swift build
 
       - name: FFI smoke test
-        run: swift run TokenBar
+        run: swift run TokenBar --smoke
