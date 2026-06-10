@@ -18,8 +18,14 @@ private let MAX_HEIGHT: CGFloat = 4.0
 
 private let activeLight = GraphRGB(hex: 0xBFDBFE)
 private let activeDark = GraphRGB(hex: 0x1E3A8A)
-private let inactiveTop = GraphRGB(hex: 0xFFFFFF)
-private let inactiveSide = GraphRGB(hex: 0xEAEDF2)
+
+/// Inactive "floor" tiles follow the system appearance — the web version
+/// hardcodes white, which reads harsh against the dark popover glass.
+private func inactiveColors(dark: Bool) -> (top: GraphRGB, side: GraphRGB) {
+    dark
+        ? (GraphRGB(hex: 0x3A4150), GraphRGB(hex: 0x2B313D))
+        : (GraphRGB(hex: 0xFFFFFF), GraphRGB(hex: 0xEAEDF2))
+}
 
 struct GraphRGB {
     var r: CGFloat
@@ -188,8 +194,19 @@ final class ContributionGraphView: SCNView {
     var cellByNodeName: [String: GridCell] = [:]
     /// World-space AABB corners of the populated (active) cells, for fit.
     var fitCorners: [simd_double3] = []
+    /// Auto-fit on the first layout pass with a real size — fitting before
+    /// layout sees a zero-height view and blows the ortho scale to its clamp.
+    var needsInitialFit = false
     private var tooltip: NSTextField!
     private var hoveredNode: SCNNode?
+
+    override func layout() {
+        super.layout()
+        if needsInitialFit, bounds.width > 0, bounds.height > 0 {
+            needsInitialFit = false
+            fitToContent()
+        }
+    }
 
     func setupTooltip() {
         let t = NSTextField(wrappingLabelWithString: "")
@@ -295,8 +312,9 @@ final class ContributionGraphView: SCNView {
 
 @MainActor
 private func buildGridNode(
-    grid: TokenBarCore.GridLayout
+    grid: TokenBarCore.GridLayout, dark: Bool
 ) -> (node: SCNNode, mapping: [String: GridCell], fitCorners: [simd_double3]) {
+    let (inactiveTop, inactiveSide) = inactiveColors(dark: dark)
     let totalWidth = CGFloat(grid.cols) * STEP
     let totalDepth = CGFloat(grid.rows) * STEP
     let offsetX = -totalWidth / 2
@@ -365,9 +383,11 @@ struct ContributionGraph3D: View {
     let grid: TokenBarCore.GridLayout
 
     @State private var holder = GraphHolder()
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        ContributionGraphRepresentable(grid: grid, holder: holder)
+        ContributionGraphRepresentable(
+            grid: grid, dark: colorScheme == .dark, holder: holder)
             .overlay(alignment: .topTrailing) {
                 HStack(spacing: 4) {
                     button("Fit") { holder.view?.fitToContent() }
@@ -399,6 +419,7 @@ final class GraphHolder {
 
 private struct ContributionGraphRepresentable: NSViewRepresentable {
     let grid: TokenBarCore.GridLayout
+    let dark: Bool
     let holder: GraphHolder
 
     func makeNSView(context: Context) -> ContributionGraphView {
@@ -434,13 +455,8 @@ private struct ContributionGraphRepresentable: NSViewRepresentable {
 
         installGrid(into: view, context: context)
 
-        // Auto-fit on first appearance unless a saved camera was restored;
-        // the view has no size yet in makeNSView, so defer one runloop turn.
-        if !OrbitRig.hasSavedCamera {
-            DispatchQueue.main.async { [weak view] in
-                view?.fitToContent()
-            }
-        }
+        // Auto-fit on first appearance unless a saved camera was restored.
+        view.needsInitialFit = !OrbitRig.hasSavedCamera
         return view
     }
 
@@ -452,12 +468,12 @@ private struct ContributionGraphRepresentable: NSViewRepresentable {
     }
 
     private var gridSignature: String {
-        "\(grid.cols)|\(grid.maxTokens)|\(grid.cells.filter(\.active).count)"
+        "\(grid.cols)|\(grid.maxTokens)|\(grid.cells.filter(\.active).count)|\(dark)"
     }
 
     private func installGrid(into view: ContributionGraphView, context: Context) {
         view.scene?.rootNode.childNode(withName: "grid", recursively: false)?.removeFromParentNode()
-        let (node, mapping, corners) = buildGridNode(grid: grid)
+        let (node, mapping, corners) = buildGridNode(grid: grid, dark: dark)
         view.scene?.rootNode.addChildNode(node)
         view.cellByNodeName = mapping
         view.fitCorners = corners
