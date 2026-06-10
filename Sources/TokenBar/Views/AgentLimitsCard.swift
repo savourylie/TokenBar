@@ -210,13 +210,7 @@ struct AgentLimitsCard: View {
                         .help("Drag to reorder")
                         .gesture(dragGesture(for: id, visible: visible))
                 }
-                Circle()
-                    .fill(Color(hex: style.color))
-                    .frame(width: 14, height: 14)
-                    .overlay(
-                        Text(String(style.displayName.prefix(1)))
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(.white))
+                AgentIconView(clientId: id, size: 14)
                 Text(style.displayName)
                     .font(.caption.weight(.semibold))
                 Spacer()

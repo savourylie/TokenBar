@@ -38,12 +38,8 @@ struct DashboardTabs: View {
             active = id
         } label: {
             HStack(spacing: 5) {
-                if let color {
-                    Text(String(label.prefix(1)).uppercased())
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 14, height: 14)
-                        .background(Color(hex: color), in: Circle())
+                if color != nil {
+                    AgentIconView(clientId: id, size: 14)
                 }
                 Text(label)
                     .font(.caption.weight(active == id ? .semibold : .regular))

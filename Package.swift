@@ -18,6 +18,7 @@ let package = Package(
             dependencies: ["TokenBarCore"],
             path: "Sources/TokenBar",
             resources: [
+                .copy("Resources/agent-icons"),
                 .copy("Resources/anim-cat2"),
                 .copy("Resources/anim-cat2-light"),
                 .copy("Resources/anim-parrot"),
