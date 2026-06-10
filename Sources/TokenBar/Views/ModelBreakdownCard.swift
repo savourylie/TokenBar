@@ -13,8 +13,18 @@ struct ModelBreakdownCard: View {
     var title = "Models"
 
     @State private var expanded = false
+    @State private var hover: HoverState?
+    @State private var tooltipSize: CGSize = .zero
+
+    private struct HoverState {
+        let entry: ModelReportEntry
+        /// Cursor location in the rows container's coordinate space.
+        let point: CGPoint
+    }
 
     private static let maxRows = 8
+    private static let tooltipWidth: CGFloat = 210
+    private static let rowsSpace = "model-rows"
 
     /// Token-category palette (matches the Tauri .model-seg-* CSS classes).
     private static let tokenKinds: [(label: String, color: String, pick: (ModelReportEntry) -> Int64)] = [
@@ -59,6 +69,15 @@ struct ModelBreakdownCard: View {
                         id: \.self.rowID
                     ) { entry in
                         row(entry)
+                    }
+                }
+                .coordinateSpace(name: Self.rowsSpace)
+                .overlay(alignment: .topLeading) {
+                    if let hover {
+                        GeometryReader { geo in
+                            tooltip(hover.entry)
+                                .offset(tooltipOffset(point: hover.point, container: geo.size))
+                        }
                     }
                 }
                 let hidden = rows.count - min(rows.count, Self.maxRows)
@@ -110,7 +129,18 @@ struct ModelBreakdownCard: View {
                     .foregroundStyle(Color(hex: "#22c55e"))
             }
         }
-        .help(helpText(entry))
+        // Float the rich tooltip near the cursor anywhere on the row — the
+        // web card tracks just the bar, but a 6pt-tall hover target is too
+        // fiddly with a real pointer.
+        .contentShape(Rectangle())
+        .onContinuousHover(coordinateSpace: .named(Self.rowsSpace)) { phase in
+            switch phase {
+            case let .active(point):
+                hover = HoverState(entry: entry, point: point)
+            case .ended:
+                hover = nil
+            }
+        }
     }
 
     /// sqrt-scaled stacked category bar.
@@ -134,19 +164,73 @@ struct ModelBreakdownCard: View {
         .frame(height: 6)
     }
 
-    /// True linear shares for the system tooltip (the rich floating tooltip
-    /// from the web app is deferred to the polish phase).
-    private func helpText(_ entry: ModelReportEntry) -> String {
-        let head = "\(entry.model) — \(ClientRegistry.style(entry.client).displayName) · \(entry.provider)"
-        let total = "\(Format.exactTokens(entry.total)) tokens · \(Format.usd(entry.cost))"
+    // MARK: - Hover tooltip
+
+    /// Keep the tooltip inside the card horizontally; flip above the cursor
+    /// for rows past the first few so it never clips out the card's bottom.
+    private func tooltipOffset(point: CGPoint, container: CGSize) -> CGSize {
+        let x = min(max(point.x - Self.tooltipWidth / 2, 0), max(0, container.width - Self.tooltipWidth))
+        let height = tooltipSize.height > 0 ? tooltipSize.height : 120
+        let y = point.y > 110 ? point.y - height - 10 : point.y + 14
+        return CGSize(width: x, height: y)
+    }
+
+    private struct TooltipSizeKey: PreferenceKey {
+        static let defaultValue: CGSize = .zero
+        static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+            value = nextValue()
+        }
+    }
+
+    /// True token counts and linear shares per category — the bar itself is
+    /// sqrt-scaled, so this is where the real numbers live.
+    private func tooltip(_ entry: ModelReportEntry) -> some View {
         let kinds = Self.tokenKinds
-            .map { (label: $0.label, value: $0.pick(entry)) }
+            .map { (label: $0.label, color: $0.color, value: $0.pick(entry)) }
             .filter { $0.value > 0 }
-            .map { kind in
-                let pct = entry.total > 0 ? Double(kind.value) / Double(entry.total) * 100 : 0
-                return "\(kind.label): \(Format.compactTokens(kind.value)) · \(Int(pct.rounded()))%"
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(Color(hex: colors.color(entry.provider, entry.model)))
+                    .frame(width: 6, height: 6)
+                Text(entry.model)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
-        return ([head, total] + kinds).joined(separator: "\n")
+            Text("\(ClientRegistry.style(entry.client).displayName) · \(entry.provider)")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            HStack {
+                Text("\(Format.compactTokens(entry.total)) tokens")
+                Spacer()
+                Text(Format.usd(entry.cost))
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            ForEach(kinds, id: \.label) { kind in
+                HStack(spacing: 4) {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color(hex: kind.color))
+                        .frame(width: 6, height: 6)
+                    Text(kind.label)
+                    Spacer()
+                    Text("\(Format.compactTokens(kind.value)) · \(Int((Double(kind.value) / Double(max(1, entry.total)) * 100).rounded()))%")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption2)
+            }
+        }
+        .padding(8)
+        .frame(width: Self.tooltipWidth, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.quaternary))
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: TooltipSizeKey.self, value: geo.size)
+            })
+        .onPreferenceChange(TooltipSizeKey.self) { tooltipSize = $0 }
+        .allowsHitTesting(false)
     }
 }
 
