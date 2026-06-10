@@ -42,6 +42,7 @@ struct UsageChartCard: View {
                 : (stackBy == .model ? "Stacked by model" : "Stacked by agent"),
             trailing: { toggles }
         ) {
+            togglesRow
             TokenUsageRow(stats: stats)
             if is3D {
                 // Year grid over the same client slice; sized to match the 2D
@@ -66,12 +67,20 @@ struct UsageChartCard: View {
 
     // MARK: - Header toggles
 
+    /// The 2D/3D view switch rides the header; the 2D-only group/metric
+    /// toggles get their own slim row below — stacked in the header they made
+    /// it three rows tall and left the card top mostly whitespace, and all
+    /// three don't fit beside the title without wrapping.
     private var toggles: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            picker(selection: $chartViewRaw, options: [("2d", "2D"), ("3d", "3D")])
-            // Stacking and bar metric are 2D-only concepts — the 3D view is
-            // the year heatmap (web hides these the same way).
-            if !is3D {
+        picker(selection: $chartViewRaw, options: [("2d", "2D"), ("3d", "3D")])
+    }
+
+    @ViewBuilder private var togglesRow: some View {
+        // Stacking and bar metric are 2D-only concepts — the 3D view is the
+        // year heatmap (web hides these the same way).
+        if !is3D {
+            HStack(spacing: 4) {
+                Spacer()
                 picker(selection: $stackByRaw, options: [
                     (StackBy.model.rawValue, "Model"), (StackBy.agent.rawValue, "Agent"),
                 ])
@@ -88,6 +97,8 @@ struct UsageChartCard: View {
             ForEach(options, id: \.0) { value, label in
                 Button(label) { selection.wrappedValue = value }
                     .buttonStyle(.plain)
+                    .lineLimit(1)
+                    .fixedSize()
                     .font(.caption2.weight(selection.wrappedValue == value ? .semibold : .regular))
                     .foregroundStyle(selection.wrappedValue == value ? .primary : .secondary)
                     .padding(.horizontal, 6)
