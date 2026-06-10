@@ -1,0 +1,4 @@
+# Match the app's minimum OS so the staticlib doesn't trigger ld
+# version-mismatch warnings when linked by SwiftPM (Package.swift .macOS(.v14)).
+[env]
+MACOSX_DEPLOYMENT_TARGET = "14.0"

@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = ["crates/tb_core_ffi", "vendor/tokscale-core"]
+
+[profile.release]
+lto = true
+strip = "debuginfo"

@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build Rust staticlib
+        run: cargo build --release
+
+      - name: Build Swift package
+        run: swift build
+
+      - name: FFI smoke test
+        run: swift run TokenBar

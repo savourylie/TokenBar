@@ -1,0 +1,30 @@
+// swift-tools-version: 6.0
+import PackageDescription
+
+// The Rust staticlib must be built first: `cargo build --release` (or `make`).
+// `swift build` must run from the repo root so the relative -L path resolves.
+let package = Package(
+    name: "TokenBar",
+    platforms: [.macOS(.v14)],
+    targets: [
+        .target(name: "CTB", path: "Sources/CTB"),
+        .target(
+            name: "TokenBarCore",
+            dependencies: ["CTB"],
+            path: "Sources/TokenBarCore"
+        ),
+        .executableTarget(
+            name: "TokenBar",
+            dependencies: ["TokenBarCore"],
+            path: "Sources/TokenBar",
+            linkerSettings: [
+                .unsafeFlags(["-L", "target/release", "-ltb_core_ffi"]),
+                .linkedFramework("Security"),
+                .linkedFramework("SystemConfiguration"),
+                .linkedFramework("CoreFoundation"),
+                .linkedLibrary("c++"),
+                .linkedLibrary("resolv"),
+            ]
+        ),
+    ]
+)
