@@ -16,6 +16,8 @@ struct UsageChartCard: View {
     /// "2d" = trailing-30-day stacked bars, "3d" = full-year contribution grid.
     @AppStorage("tokenbar.chart.view") private var chartViewRaw = "2d"
     @State private var hoverIndex: Int?
+    @State private var hoverY: CGFloat = 0
+    @State private var tooltipSize: CGSize = .zero
 
     private static let legendMax = 12
     private static let chartHeight: CGFloat = 150
@@ -152,10 +154,15 @@ struct UsageChartCard: View {
                 canvas(bars: bars, barWidth: barWidth, maxValue: maxValue)
                 if let index = hoverIndex, bars.indices.contains(index),
                    !bars[index].isEmpty {
+                    // Dodge the cursor like the model-card tooltip: below the
+                    // pointer in the chart's upper half, above it lower down —
+                    // pinning to the top kept covering the hovered area.
                     tooltip(bars[index])
                         .offset(
                             x: tooltipX(index: index, barWidth: barWidth, width: width),
-                            y: 0)
+                            y: hoverY < Self.chartHeight * 0.45
+                                ? hoverY + 16
+                                : hoverY - (tooltipSize.height > 0 ? tooltipSize.height : 120) - 12)
                 }
             }
             .onContinuousHover { phase in
@@ -163,6 +170,7 @@ struct UsageChartCard: View {
                 case let .active(point):
                     let index = Int(point.x / (barWidth + Self.gap))
                     hoverIndex = bars.indices.contains(index) ? index : nil
+                    hoverY = point.y
                 case .ended:
                     hoverIndex = nil
                 }
@@ -255,6 +263,18 @@ struct UsageChartCard: View {
         .frame(width: Self.tooltipWidth, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.quaternary))
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: TooltipSizeKey.self, value: geo.size)
+            })
+        .onPreferenceChange(TooltipSizeKey.self) { tooltipSize = $0 }
         .allowsHitTesting(false)
+    }
+
+    private struct TooltipSizeKey: PreferenceKey {
+        static let defaultValue: CGSize = .zero
+        static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+            value = nextValue()
+        }
     }
 }
