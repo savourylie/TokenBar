@@ -7,6 +7,7 @@ use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 const CODEX_USAGE_URL: &str = "https://chatgpt.com/backend-api/wham/usage";
 const CODEX_REFRESH_URL: &str = "https://auth.openai.com/oauth/token";
@@ -352,18 +353,107 @@ async fn fetch_codex() -> AgentUsageSnapshot {
     }
 }
 
+/// Claude's `/api/oauth/usage` rate-limits aggressively (and the budget is
+/// shared with any other monitor on the account, e.g. codexbar). Modeled on
+/// codexbar's ClaudeOAuthUsageRateLimitGate: after a 429, stop hitting the
+/// endpoint until Retry-After (default 5 min) and serve the last good
+/// snapshot so the card keeps its data instead of flashing an error.
+struct ClaudeUsageGate {
+    blocked_until: Option<DateTime<Utc>>,
+    last_good: Option<AgentUsageSnapshot>,
+}
+
+static CLAUDE_USAGE_GATE: Mutex<ClaudeUsageGate> = Mutex::new(ClaudeUsageGate {
+    blocked_until: None,
+    last_good: None,
+});
+
+fn claude_gate_blocked_until(now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    let mut gate = CLAUDE_USAGE_GATE.lock().unwrap();
+    match gate.blocked_until {
+        Some(until) if until > now => Some(until),
+        Some(_) => {
+            gate.blocked_until = None;
+            None
+        }
+        None => None,
+    }
+}
+
+fn claude_gate_record_rate_limit(retry_after: Option<DateTime<Utc>>, now: DateTime<Utc>) {
+    let blocked_until = retry_after
+        .filter(|until| *until > now)
+        .unwrap_or_else(|| now + chrono::Duration::minutes(5));
+    CLAUDE_USAGE_GATE.lock().unwrap().blocked_until = Some(blocked_until);
+}
+
+fn claude_gate_record_success(snapshot: &AgentUsageSnapshot) {
+    let mut gate = CLAUDE_USAGE_GATE.lock().unwrap();
+    gate.blocked_until = None;
+    gate.last_good = Some(snapshot.clone());
+}
+
+/// While the gate is closed, prefer the cached snapshot (its `updated_at`
+/// stays honest); with nothing cached yet, surface a countdown error.
+fn claude_gate_fallback(blocked_until: DateTime<Utc>, now: DateTime<Utc>) -> AgentUsageSnapshot {
+    if let Some(snapshot) = CLAUDE_USAGE_GATE.lock().unwrap().last_good.clone() {
+        return snapshot;
+    }
+    let wait_secs = (blocked_until - now).num_seconds().max(0);
+    AgentUsageSnapshot {
+        client_id: "claude".to_string(),
+        source: "oauth".to_string(),
+        updated_at: now.to_rfc3339_opts(SecondsFormat::Millis, true),
+        identity: None,
+        windows: Vec::new(),
+        credits: None,
+        error: Some(format!(
+            "Claude OAuth usage endpoint is rate limited. Retrying automatically in ~{}s.",
+            wait_secs
+        )),
+    }
+}
+
+fn parse_retry_after(value: Option<&reqwest::header::HeaderValue>) -> Option<DateTime<Utc>> {
+    let raw = value?.to_str().ok()?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    if let Ok(seconds) = raw.parse::<i64>() {
+        return (seconds >= 0).then(|| Utc::now() + chrono::Duration::seconds(seconds));
+    }
+    DateTime::parse_from_rfc2822(raw)
+        .ok()
+        .map(|t| t.with_timezone(&Utc))
+}
+
 async fn fetch_claude() -> AgentUsageSnapshot {
+    let now = Utc::now();
+    if let Some(blocked_until) = claude_gate_blocked_until(now) {
+        return claude_gate_fallback(blocked_until, now);
+    }
     match fetch_claude_inner().await {
-        Ok(snapshot) => snapshot,
-        Err(error) => AgentUsageSnapshot {
-            client_id: "claude".to_string(),
-            source: "oauth".to_string(),
-            updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-            identity: None,
-            windows: Vec::new(),
-            credits: None,
-            error: Some(error),
-        },
+        Ok(snapshot) => {
+            claude_gate_record_success(&snapshot);
+            snapshot
+        }
+        Err(error) => {
+            // A 429 inside fetch_claude_inner arms the gate; fall back to the
+            // cached snapshot rather than blanking the card.
+            let now = Utc::now();
+            if let Some(blocked_until) = claude_gate_blocked_until(now) {
+                return claude_gate_fallback(blocked_until, now);
+            }
+            AgentUsageSnapshot {
+                client_id: "claude".to_string(),
+                source: "oauth".to_string(),
+                updated_at: now.to_rfc3339_opts(SecondsFormat::Millis, true),
+                identity: None,
+                windows: Vec::new(),
+                credits: None,
+                error: Some(error),
+            }
+        }
     }
 }
 
@@ -488,6 +578,11 @@ async fn fetch_claude_inner() -> Result<AgentUsageSnapshot, String> {
         .await
         .map_err(|e| format!("Claude OAuth request failed: {}", e))?;
     let status = response.status();
+    let retry_after = if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        parse_retry_after(response.headers().get(reqwest::header::RETRY_AFTER))
+    } else {
+        None
+    };
     let body = response
         .text()
         .await
@@ -505,8 +600,9 @@ async fn fetch_claude_inner() -> Result<AgentUsageSnapshot, String> {
         );
     }
     if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        claude_gate_record_rate_limit(retry_after, Utc::now());
         return Err(
-            "Claude OAuth usage endpoint is rate limited. Try Refresh again later.".to_string(),
+            "Claude OAuth usage endpoint is rate limited. Backing off automatically.".to_string(),
         );
     }
     if !status.is_success() {
@@ -1302,6 +1398,74 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_retry_after_seconds_and_http_date() {
+        let header = reqwest::header::HeaderValue::from_static("120");
+        let parsed = parse_retry_after(Some(&header)).unwrap();
+        let delta = (parsed - Utc::now()).num_seconds();
+        assert!((118..=120).contains(&delta), "delta was {}", delta);
+
+        let header = reqwest::header::HeaderValue::from_static("Fri, 21 Nov 2025 09:00:00 GMT");
+        let parsed = parse_retry_after(Some(&header)).unwrap();
+        assert_eq!(parsed.timestamp(), 1_763_715_600);
+
+        let header = reqwest::header::HeaderValue::from_static("bogus");
+        assert!(parse_retry_after(Some(&header)).is_none());
+        assert!(parse_retry_after(None).is_none());
+    }
+
+    // Single test for the whole gate lifecycle — the gate is a process-wide
+    // static, so split tests would race under the parallel test runner.
+    #[test]
+    fn claude_gate_blocks_then_clears() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).single().unwrap();
+        assert!(claude_gate_blocked_until(now).is_none());
+
+        // 429 with no Retry-After → default 5-minute cooldown.
+        claude_gate_record_rate_limit(None, now);
+        let until = claude_gate_blocked_until(now).unwrap();
+        assert_eq!((until - now).num_seconds(), 300);
+
+        // No cached snapshot yet → countdown error.
+        let fallback = claude_gate_fallback(until, now);
+        assert!(fallback.error.unwrap().contains("~300s"));
+        assert!(fallback.windows.is_empty());
+
+        // Cooldown expiry clears the gate lazily.
+        let later = now + chrono::Duration::seconds(301);
+        assert!(claude_gate_blocked_until(later).is_none());
+
+        // Success caches the snapshot; a later 429 serves it instead.
+        let snapshot = AgentUsageSnapshot {
+            client_id: "claude".to_string(),
+            source: "oauth".to_string(),
+            updated_at: now.to_rfc3339_opts(SecondsFormat::Millis, true),
+            identity: None,
+            windows: vec![UsageWindow {
+                label: "Session".to_string(),
+                used_percent: 20.0,
+                remaining_percent: 80.0,
+                resets_at: None,
+                reset_text: None,
+                window_minutes: Some(300),
+                historical_expected_percent: None,
+                run_out_probability: None,
+            }],
+            credits: None,
+            error: None,
+        };
+        claude_gate_record_success(&snapshot);
+        assert!(claude_gate_blocked_until(later).is_none());
+        claude_gate_record_rate_limit(Some(later + chrono::Duration::seconds(60)), later);
+        let until = claude_gate_blocked_until(later).unwrap();
+        let fallback = claude_gate_fallback(until, later);
+        assert!(fallback.error.is_none());
+        assert_eq!(fallback.windows.len(), 1);
+
+        // Leave the gate clean for any other test touching the static.
+        claude_gate_record_success(&snapshot);
+    }
 
     #[test]
     fn maps_codex_primary_and_secondary_windows() {
