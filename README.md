@@ -51,9 +51,14 @@ broken down — six lenses, plus the same year of usage as an orbitable 3D graph
   </tr>
   <tr>
     <td align="center" width="50%"><img src="docs/screenshots/agents.png" alt="Agents view" width="300"><br><sub><b>Agents</b> — sub-agents ranked by cost</sub></td>
-    <td align="center" width="50%"><sub>Plus <b>OAuth quota cards</b> with pace projections, a live session trace, streaks, and full keyboard control (⌘1–9 tabs, ⌘G chart toggle, ⌘, settings).<br><br>A failed refresh never blanks a reading — the last known value stays until a fresh one lands.</sub></td>
+    <td align="center" width="50%"><img src="docs/screenshots/settings.png" alt="Settings" width="300"><br><sub><b>Settings</b> — menu-bar title, icon &amp; quota source</sub></td>
   </tr>
 </table>
+
+Plus **OAuth quota cards** with pace projections, a live session trace, streaks,
+and full keyboard control (⌘1–9 tabs, ⌘G chart toggle, ⌘, settings). A failed
+refresh never blanks a reading — the last known value stays until a fresh one
+lands.
 
 ## Install
 
