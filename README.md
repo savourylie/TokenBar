@@ -14,20 +14,21 @@ nothing is uploaded anywhere.
   <img src="docs/screenshots/popover-dark.png" alt="TokenBar popover (dark) — Liquid Glass over the desktop wallpaper" width="420">
 </p>
 
-## Install (beta)
+## Install
 
 ```sh
-brew install nanako0129/tokenbar/tokenbar@beta
+brew install --cask nanako0129/tokenbar/tokenbar
 ```
 
-Installs **TokenBar Beta.app** alongside the stable
-[Tauri TokenBar](https://github.com/Nanako0129/TokenBar) — both can run at
-once. In-app updates arrive via Sparkle. The app is ad-hoc signed (not
-notarized); the cask clears the quarantine attribute on install, the same
-disclosed approach the stable cask uses.
+In-app updates arrive via Sparkle; future betas ride an opt-in update
+channel (Settings → "Receive beta updates") instead of a separate app.
+The app is ad-hoc signed (not notarized); the cask clears the quarantine
+attribute on install, as disclosed.
 
 Requires an Apple Silicon Mac on macOS 14+. Liquid Glass needs macOS 26;
-earlier systems get a vibrancy fallback.
+earlier systems get a vibrancy fallback. Still on macOS 11–13? The final
+Tauri build stays available as
+[`tokenbar@legacy`](https://github.com/Nanako0129/TokenBar-Tauri).
 
 ## Highlights
 

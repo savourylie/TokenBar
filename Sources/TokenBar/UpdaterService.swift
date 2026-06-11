@@ -50,7 +50,13 @@ final class UpdaterService: NSObject, SPUUpdaterDelegate {
         controller?.checkForUpdates(nil)
     }
 
-    // MARK: - SPUUpdaterDelegate (silent probe results)
+    // MARK: - SPUUpdaterDelegate
+
+    /// Prerelease appcast items are tagged <sparkle:channel>beta</sparkle:channel>;
+    /// only installs that opt in (Settings → "Receive beta updates") see them.
+    nonisolated func allowedChannels(for updater: SPUUpdater) -> Set<String> {
+        UserDefaults.standard.bool(forKey: "tokenbar.updates.beta") ? ["beta"] : []
+    }
 
     nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         let version = item.displayVersionString

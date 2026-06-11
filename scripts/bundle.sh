@@ -3,18 +3,17 @@
 #
 #   scripts/bundle.sh [marketing-version] [build-number]
 #
-# Defaults: 1.0.0-beta.1 / 100. Run from the repo root. The beta channel uses
-# its own bundle id (com.nyanako.tokenbar.beta) so it can run alongside the
-# Tauri stable app without fighting over LaunchServices/defaults; the id
-# switches to com.nyanako.tokenbar at the stable 1.0.0 release (Phase 10).
+# Run from the repo root. Since v1.0.0 there is a single app identity
+# (TokenBar.app / com.nyanako.tokenbar) — prereleases ship through the same
+# bundle on the Sparkle "beta" channel instead of a side-by-side app. The
+# retired beta identity (com.nyanako.tokenbar.beta / "TokenBar Beta.app")
+# is migrated from on first launch.
 set -euo pipefail
 
-VERSION="${1:-1.0.0-beta.1}"
+VERSION="${1:-1.0.0}"
 BUILD_NUMBER="${2:-100}"
-BUNDLE_ID="${BUNDLE_ID:-com.nyanako.tokenbar.beta}"
-# The beta installs alongside the stable Tauri TokenBar.app, so the bundle
-# carries a distinct name to avoid the /Applications file collision.
-APP_NAME="${APP_DISPLAY:-TokenBar Beta}"
+BUNDLE_ID="${BUNDLE_ID:-com.nyanako.tokenbar}"
+APP_NAME="${APP_DISPLAY:-TokenBar}"
 OUT_DIR="dist"
 APP="$OUT_DIR/$APP_NAME.app"
 
@@ -75,9 +74,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>SUPublicEDKey</key>
     <string>EzyeEi0NEwYK/pYigOPVClXmbmnHXXBEHM7r2uy8GYs=</string>
     <!-- raw main-branch URL: GitHub's releases/latest/download excludes
-         prerelease-flagged releases, which would break the beta channel -->
+         prerelease-flagged releases, which would break the beta channel.
+         The old TokenBar-Native path keeps redirecting here for existing
+         beta installs (the name is never reclaimed). -->
     <key>SUFeedURL</key>
-    <string>https://raw.githubusercontent.com/Nanako0129/TokenBar-Native/main/appcast.xml</string>
+    <string>https://raw.githubusercontent.com/Nanako0129/TokenBar/main/appcast.xml</string>
 </dict>
 </plist>
 PLIST

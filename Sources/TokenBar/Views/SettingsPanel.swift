@@ -13,6 +13,7 @@ struct SettingsPanel: View {
     @AppStorage(TrayAnimator.styleKey) private var animationStyle = "cat"
     @AppStorage(IconColoring.storageKey) private var iconColoringRaw = IconColoring.warningOnly.rawValue
     @AppStorage(TrayAnimator.quotaSourceKey) private var quotaSource = QuotaResolver.auto
+    @AppStorage("tokenbar.updates.beta") private var betaUpdates = false
     /// Mirrors SMAppService's actual state (read once per panel appearance).
     @State private var autostartEnabled = AutostartService.isAvailable && AutostartService.isEnabled
     @AppStorage("tokenbar.limits.asUsed") private var limitsAsUsed = false
@@ -107,6 +108,12 @@ struct SettingsPanel: View {
                     row("Check for updates") {
                         Button("Check Now") { UpdaterService.shared.checkForUpdates() }
                             .controlSize(.small)
+                    }
+                    row("Receive beta updates") {
+                        Toggle("", isOn: $betaUpdates)
+                            .toggleStyle(.switch)
+                            .controlSize(.mini)
+                            .labelsHidden()
                     }
                 }
                 hint("TokenBar began as a fork of tokcat by handlecusion. Parsing & pricing come from tokscale by Junho Yeo; the menu-bar patterns reference CodexBar by Peter Steinberger; the running cat traces back to RunCat by Takuto Nakamura. MIT licensed.")

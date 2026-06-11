@@ -29,8 +29,8 @@ jobs:
 
       - name: Archive
         run: |
-          tar -czf "TokenBar-Beta.app.tar.gz" -C dist "TokenBar Beta.app"
-          shasum -a 256 "TokenBar-Beta.app.tar.gz" | awk '{print $1}' > sha256.txt
+          tar -czf "TokenBar.app.tar.gz" -C dist "TokenBar.app"
+          shasum -a 256 "TokenBar.app.tar.gz" | awk '{print $1}' > sha256.txt
           echo "SHA256=$(cat sha256.txt)" >> "$GITHUB_ENV"
 
       - name: Generate release notes
@@ -79,7 +79,7 @@ jobs:
         run: |
           umask 077
           printf '%s' "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_ed.key
-          scripts/make_appcast.sh "TokenBar-Beta.app.tar.gz" "$VERSION" "$BUILD" "$GITHUB_REF_NAME" /tmp/sparkle_ed.key release-notes.txt
+          scripts/make_appcast.sh "TokenBar.app.tar.gz" "$VERSION" "$BUILD" "$GITHUB_REF_NAME" /tmp/sparkle_ed.key release-notes.txt
           rm -f /tmp/sparkle_ed.key
 
       - name: Create GitHub release
@@ -89,8 +89,8 @@ jobs:
           PRERELEASE_FLAG=""
           case "$VERSION" in *-*) PRERELEASE_FLAG="--prerelease";; esac
           gh release create "$GITHUB_REF_NAME" \
-            "TokenBar-Beta.app.tar.gz" \
-            --title "TokenBar Native $VERSION" \
+            "TokenBar.app.tar.gz" \
+            --title "TokenBar $VERSION" \
             --notes-file release-notes.txt $PRERELEASE_FLAG
 
       - name: Publish appcast to main
@@ -103,7 +103,9 @@ jobs:
           git commit -m "chore(release): appcast for $GITHUB_REF_NAME" || exit 0
           git push origin main
 
-      - name: Bump Homebrew cask (tokenbar@beta)
+      # Prereleases ship via the Sparkle beta channel only — no cask bump.
+      - name: Bump Homebrew cask (tokenbar)
+        if: ${{ !contains(github.ref_name, '-') }}
         env:
           HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
         run: |
@@ -111,30 +113,31 @@ jobs:
           printf '%s\n' "$HOMEBREW_TAP_DEPLOY_KEY" > /tmp/tap_deploy_key
           export GIT_SSH_COMMAND="ssh -i /tmp/tap_deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
           git clone git@github.com:Nanako0129/homebrew-tokenbar.git /tmp/tap
-          cat > "/tmp/tap/Casks/tokenbar@beta.rb" <<CASK
-          cask "tokenbar@beta" do
+          cat > "/tmp/tap/Casks/tokenbar.rb" <<CASK
+          cask "tokenbar" do
             version "$VERSION"
             sha256 "$SHA256"
 
-            url "https://github.com/Nanako0129/TokenBar-Native/releases/download/v#{version}/TokenBar-Beta.app.tar.gz"
-            name "TokenBar Beta"
-            desc "Menubar dashboard for local AI token usage (native beta)"
-            homepage "https://github.com/Nanako0129/TokenBar-Native"
+            url "https://github.com/Nanako0129/TokenBar/releases/download/v#{version}/TokenBar.app.tar.gz"
+            name "TokenBar"
+            desc "Menubar dashboard for local AI token usage"
+            homepage "https://github.com/Nanako0129/TokenBar"
 
             auto_updates true
             depends_on macos: ">= :sonoma"
             depends_on arch: :arm64
 
-            app "TokenBar Beta.app"
+            app "TokenBar.app"
 
             postflight do
               system_command "/usr/bin/xattr",
-                args: ["-dr", "com.apple.quarantine", "#{appdir}/TokenBar Beta.app"]
+                args: ["-dr", "com.apple.quarantine", "#{appdir}/TokenBar.app"]
             end
 
             zap trash: [
-              "~/Library/Application Support/com.nyanako.tokenbar.beta",
-              "~/Library/Caches/com.nyanako.tokenbar.beta",
+              "~/Library/Application Support/com.nyanako.tokenbar",
+              "~/Library/Caches/com.nyanako.tokenbar",
+              "~/Library/Preferences/com.nyanako.tokenbar.plist",
               "~/Library/Preferences/com.nyanako.tokenbar.beta.plist",
             ]
           end
@@ -143,6 +146,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Casks
-          git commit -m "tokenbar@beta $VERSION"
+          git commit -m "tokenbar $VERSION"
           git push
           rm -f /tmp/tap_deploy_key
