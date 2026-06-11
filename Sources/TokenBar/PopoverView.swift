@@ -64,8 +64,8 @@ struct PopoverView: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .background(OverlayScrollerEnforcer())
             }
-            .scrollIndicators(.never)
             .clipped()
             Divider()
             footer
