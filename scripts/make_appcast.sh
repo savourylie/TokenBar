@@ -1,7 +1,7 @@
 #!/bin/bash
 # Emit appcast.xml for a release archive.
 #
-#   scripts/make_appcast.sh <archive.tar.gz> <version> <build> <tag> <ed-key-file>
+#   scripts/make_appcast.sh <archive.tar.gz> <version> <build> <tag> <ed-key-file> [notes.txt]
 #
 # Signs the archive with sign_update (Sparkle SPM artifact) and writes
 # appcast.xml beside it. Single-item feed: the latest release is the feed.
@@ -12,6 +12,7 @@ VERSION="$2"
 BUILD="$3"
 TAG="$4"
 KEY_FILE="$5"
+NOTES_FILE="${6:-}"
 
 SIGN_UPDATE=".build/artifacts/sparkle/Sparkle/bin/sign_update"
 SIGNATURE_LINE=$("$SIGN_UPDATE" -f "$KEY_FILE" "$ARCHIVE")
@@ -23,6 +24,31 @@ LENGTH=$(echo "$SIGNATURE_LINE" | sed -n 's/.*length="\([^"]*\)".*/\1/p')
 ASSET_NAME=$(basename "$ARCHIVE")
 URL="https://github.com/Nanako0129/TokenBar-Native/releases/download/$TAG/$ASSET_NAME"
 PUB_DATE=$(LC_ALL=en_US.UTF-8 date -u "+%a, %d %b %Y %H:%M:%S +0000")
+
+# Render the plain-text notes (restricted format: "New:"/"Fixes:" headings,
+# "- " bullets) into simple HTML for the Sparkle update dialog.
+DESCRIPTION=""
+if [[ -n "$NOTES_FILE" && -s "$NOTES_FILE" ]]; then
+  HTML=$(awk '
+    function esc(t) { gsub(/&/, "\&amp;", t); gsub(/</, "\&lt;", t); return t }
+    /^- / {
+      if (!inlist) { print "<ul>"; inlist = 1 }
+      print "<li>" esc(substr($0, 3)) "</li>"
+      next
+    }
+    {
+      if (inlist) { print "</ul>"; inlist = 0 }
+      if ($0 ~ /^[[:space:]]*$/) next
+      t = esc($0)
+      if (t ~ /:[[:space:]]*$/) print "<b>" t "</b>"
+      else print "<p>" t "</p>"
+    }
+    END { if (inlist) print "</ul>" }
+  ' "$NOTES_FILE")
+  DESCRIPTION="      <description><![CDATA[
+$HTML
+      ]]></description>"
+fi
 
 cat > appcast.xml <<XML
 <?xml version="1.0" encoding="utf-8"?>
@@ -36,6 +62,7 @@ cat > appcast.xml <<XML
       <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <link>https://github.com/Nanako0129/TokenBar-Native/releases/tag/$TAG</link>
+$DESCRIPTION
       <enclosure
         url="$URL"
         sparkle:edSignature="$ED_SIGNATURE"
