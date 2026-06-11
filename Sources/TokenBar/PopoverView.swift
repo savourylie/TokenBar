@@ -73,7 +73,7 @@ struct PopoverView: View {
         .animation(.easeInOut(duration: 0.22), value: showSettings)
         .animation(.easeOut(duration: 0.16), value: activeViewRaw)
         .animation(.easeOut(duration: 0.16), value: activeTab)
-        .background(GlassBackground().ignoresSafeArea())
+        .background(PopoverBackdrop().ignoresSafeArea())
         .task { await model.load() }
         .task(id: activeViewRaw) {
             await model.ensureData(for: activeView.wrappedValue)

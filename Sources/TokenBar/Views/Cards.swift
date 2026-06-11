@@ -1,8 +1,31 @@
 import SwiftUI
 import TokenBarCore
 
-/// Shared dashboard-card chrome: rounded panel with a subtle fill, matching
-/// the Tauri dashboard's card stack.
+/// Liquid Glass card surface on macOS 26+, material fallback below — the
+/// glass lives on the cards themselves (the Control Center look), not on a
+/// backdrop hidden behind opaque fills.
+struct GlassCardBackground: ViewModifier {
+    var cornerRadius: CGFloat = 10
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+        } else {
+            content
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+        }
+    }
+}
+
+extension View {
+    func glassCard(cornerRadius: CGFloat = 10) -> some View {
+        modifier(GlassCardBackground(cornerRadius: cornerRadius))
+    }
+}
+
+/// Shared dashboard-card chrome: rounded glass panel, matching the Tauri
+/// dashboard's card stack.
 struct DashCard<Content: View>: View {
     let title: String
     var subtitle: String?
@@ -48,7 +71,7 @@ struct DashCard<Content: View>: View {
             content()
         }
         .padding(12)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+        .glassCard()
     }
 }
 

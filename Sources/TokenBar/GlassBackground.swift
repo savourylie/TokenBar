@@ -27,8 +27,17 @@ struct GlassBackground: View {
     }
 }
 
-/// AppKit visual-effect bridge for the pre-26 fallback.
-private struct VisualEffectBackground: NSViewRepresentable {
+/// Popover root backdrop: HUD-grade translucency sampling what's behind the
+/// window (the .popover chrome reads nearly opaque in dark mode, burying the
+/// wallpaper blur that makes Liquid Glass cards come alive).
+struct PopoverBackdrop: View {
+    var body: some View {
+        VisualEffectBackground(material: .hudWindow)
+    }
+}
+
+/// AppKit visual-effect bridge.
+struct VisualEffectBackground: NSViewRepresentable {
     let material: NSVisualEffectView.Material
 
     func makeNSView(context: Context) -> NSVisualEffectView {
