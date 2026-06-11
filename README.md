@@ -8,6 +8,18 @@ Liquid Glass on macOS 26+.
 > [TokenBar](https://github.com/Nanako0129/TokenBar); this repo takes over at
 > feature parity (target: v0.4.4 feature set).
 
+## Install (beta)
+
+```sh
+brew install nanako0129/tokenbar/tokenbar@beta
+```
+
+Installs **TokenBar Beta.app** alongside the stable
+[Tauri TokenBar](https://github.com/Nanako0129/TokenBar) — both can run at
+once. In-app updates arrive via Sparkle. The app is ad-hoc signed (not
+notarized); the cask clears the quarantine attribute on install, the same
+disclosed approach the stable cask uses.
+
 ## Progress
 
 | Phase | Scope | Status |
@@ -21,7 +33,7 @@ Liquid Glass on macOS 26+.
 | 6 | Agent limits + pace + live trace + settings | ✅ |
 | 7 | 3D contribution graph integration | ✅ |
 | 8 | Cat animation, shortcuts, autostart | autostart pending Phase 9, rest ✅ |
-| 9 | Sparkle updater, signing, packaging, release CI | — |
+| 9 | Sparkle updater, signing, packaging, release CI | ✅ (beta.2 live) |
 | 10 | Bundle-id switch, migration, v1.0.0 | — |
 
 ## Architecture
