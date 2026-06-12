@@ -111,12 +111,7 @@ const views = slots.map((s, i) => ({ ...s, ...c.items[i] }))
   .meta .tag { width: 9px; height: 9px; border-radius: 3px; background: var(--ac); box-shadow: 0 0 10px -1px var(--ac); }
   .meta p { color: var(--muted); font-size: 14.5px; margin-top: 8px; }
 
-  .card.wide {
-    grid-column: 1 / -1; display: grid; grid-template-columns: 1.4fr 1fr;
-    transform: rotate(-1.4deg); margin: 18px -8px 0;
-  }
-  .card.wide:hover { transform: rotate(0deg) translateY(-3px); }
-  .card.wide.reveal:not(.in) { transform: rotate(-1.4deg) translateY(26px); }
+  .card.wide { grid-column: 1 / -1; display: grid; grid-template-columns: 1.4fr 1fr; margin-top: 10px; }
   .card.wide .frame { aspect-ratio: auto; border-bottom: none; border-right: 1px solid var(--line); }
   .card.wide .meta { align-self: center; padding: 32px 34px; }
   .card.wide .meta h3 { font-size: 24px; }
