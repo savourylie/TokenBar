@@ -1,4 +1,9 @@
 ---
+// fonts are self-hosted (fontsource variable) so first paint never blocks on
+// a third-party stylesheet; opsz variant for Bricolage keeps the display axis
+import '@fontsource-variable/bricolage-grotesque/opsz.css'
+import '@fontsource-variable/hanken-grotesk'
+import '@fontsource-variable/jetbrains-mono'
 import '../styles/global.css'
 import { t, type Locale } from '../i18n/copy'
 
@@ -68,13 +73,6 @@ const jsonLd = {
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
 
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </head>

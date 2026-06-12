@@ -46,9 +46,9 @@
   --glass-sheen: rgba(255, 255, 255, 0.1);
   --glass-shadow: 0 24px 70px -30px rgba(0, 0, 0, 0.75);
 
-  --font-display: 'Bricolage Grotesque', 'Hanken Grotesk', system-ui, sans-serif;
-  --font-body: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-display: 'Bricolage Grotesque Variable', 'Hanken Grotesk Variable', system-ui, sans-serif;
+  --font-body: 'Hanken Grotesk Variable', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
 
   --radius: 20px;
   --radius-sm: 12px;

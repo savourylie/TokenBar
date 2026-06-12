@@ -3,7 +3,20 @@ import { t, type Locale } from '../i18n/copy'
 const { locale = 'en' } = Astro.props as { locale?: Locale }
 const c = t(locale).faq
 const faqs = c.items
+
+// FAQPage rich-result structured data, mirroring the visible Q&A verbatim
+const faqLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+}
 ---
+
+<script type="application/ld+json" set:html={JSON.stringify(faqLd)} />
 
 <section class="section faq">
   <div class="container faq-grid">

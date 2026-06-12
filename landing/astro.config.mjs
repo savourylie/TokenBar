@@ -7,5 +7,13 @@ import sitemap from '@astrojs/sitemap'
 export default defineConfig({
   site: process.env.PUBLIC_SITE_URL ?? 'https://tokenbar.nyanako.com',
   trailingSlash: 'ignore',
-  integrations: [sitemap()],
+  integrations: [
+    sitemap({
+      // emit xhtml:link hreflang alternates inside the sitemap as well
+      i18n: {
+        defaultLocale: 'en',
+        locales: { en: 'en', 'zh-tw': 'zh-Hant-TW' },
+      },
+    }),
+  ],
 })
