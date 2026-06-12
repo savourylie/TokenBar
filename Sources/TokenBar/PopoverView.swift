@@ -10,8 +10,6 @@ struct PopoverView: View {
 
     @State private var model = DashboardModel()
     @State private var tokensPerMin: Double?
-    /// `--settings` opens straight onto the settings panel (debug/screenshot aid).
-    @State private var showSettings = CommandLine.arguments.contains("--settings")
     /// True while Cmd has been held alone for a beat — shows shortcut pins.
     @State private var cmdHeld = false
     @State private var keyMonitor: Any?
@@ -39,43 +37,28 @@ struct PopoverView: View {
             if BridgeBuild.isActive && !bridgeDismissed {
                 bridgeBanner
             }
-            if !showSettings {
-                if let stats = model.stats, stats.presentClients.count > 1 {
-                    DashboardTabs(
-                        clients: stats.presentClients, active: $activeTab,
-                        kbdHints: cmdHeld)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 8)
-                }
-                ViewSwitch(active: activeView)
+            if let stats = model.stats, stats.presentClients.count > 1 {
+                DashboardTabs(
+                    clients: stats.presentClients, active: $activeTab,
+                    kbdHints: cmdHeld)
                     .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 8)
             }
+            ViewSwitch(active: activeView)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
             Divider()
             ScrollView {
-                Group {
-                    if showSettings {
-                        SettingsPanel(agentUsage: model.agentUsage)
-                            // Navigation-push feel: settings slide in from
-                            // the right while the dashboard yields left.
-                            .transition(
-                                .move(edge: .trailing).combined(with: .opacity))
-                    } else {
-                        content
-                            .transition(
-                                .move(edge: .leading).combined(with: .opacity))
-                    }
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(OverlayScrollerEnforcer())
+                content
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(OverlayScrollerEnforcer())
             }
             .clipped()
             Divider()
             footer
         }
         .frame(width: 360, height: popoverHeight)
-        .animation(.easeInOut(duration: 0.22), value: showSettings)
         .animation(.easeOut(duration: 0.16), value: activeViewRaw)
         .animation(.easeOut(duration: 0.16), value: activeTab)
         .background(PopoverBackdrop().ignoresSafeArea())
@@ -100,9 +83,7 @@ struct PopoverView: View {
                 .font(.headline)
             Spacer()
             liveRateBadge
-            if !showSettings {
-                yearMenu
-            }
+            yearMenu
             refreshButton
         }
         .padding(.horizontal, 16)
@@ -293,7 +274,7 @@ struct PopoverView: View {
 
     private var footer: some View {
         HStack {
-            Text(showSettings ? "Settings" : activeView.wrappedValue.label)
+            Text(activeView.wrappedValue.label)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Spacer()
@@ -309,12 +290,12 @@ struct PopoverView: View {
                 .help("A new version is ready — click to install")
             }
             Button {
-                showSettings.toggle()
+                openSettingsWindow(from: NSApp.keyWindow)
             } label: {
-                Image(systemName: showSettings ? "chevron.backward" : "gearshape")
+                Image(systemName: "gearshape")
             }
             .controlSize(.small)
-            .help(showSettings ? "Back to dashboard" : "Settings")
+            .help("Settings")
             Button("Quit") {
                 NSApp.terminate(nil)
             }
@@ -350,14 +331,18 @@ struct PopoverView: View {
         cmdHeld = false
     }
 
+    /// Settings live in their own window now; the transient popover closes
+    /// itself on the way (programmatic window swaps don't count as the
+    /// outside click that would normally dismiss it).
+    private func openSettingsWindow(from popoverWindow: NSWindow?) {
+        popoverWindow?.performClose(nil)
+        SettingsWindowController.shared.show()
+    }
+
     /// Returns true when the event was consumed.
     private func handleKeyDown(_ event: NSEvent) -> Bool {
-        if event.keyCode == 53 { // Esc: settings page first, else the popover
-            if showSettings {
-                showSettings = false
-            } else {
-                event.window?.performClose(nil)
-            }
+        if event.keyCode == 53 { // Esc closes the popover
+            event.window?.performClose(nil)
             return true
         }
         let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
@@ -370,20 +355,14 @@ struct PopoverView: View {
             let index = Int(chars)! - 1
             guard index < tabs.count else { return true }
             activeTab = tabs[index]
-            showSettings = false
         case "[", "]":
             let current = tabs.firstIndex(of: activeTab) ?? 0
             let step = chars == "]" ? 1 : tabs.count - 1
             activeTab = tabs[(current + step) % tabs.count]
-            showSettings = false
         case ",":
-            showSettings = true
+            openSettingsWindow(from: event.window)
         case "w":
-            if showSettings {
-                showSettings = false
-            } else {
-                event.window?.performClose(nil)
-            }
+            event.window?.performClose(nil)
         case "q":
             NSApp.terminate(nil)
         case "r":

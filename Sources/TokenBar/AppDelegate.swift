@@ -42,11 +42,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Debug hook: `swift run TokenBar --open-popover` shows the popover
-        // shortly after launch so it can be screenshotted without a click.
+        // Debug hooks: `--open-popover` shows the popover shortly after
+        // launch, `--settings` the settings window — both screenshot aids.
         if CommandLine.arguments.contains("--open-popover") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 controller.showPopover()
+            }
+        }
+        if CommandLine.arguments.contains("--settings") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                SettingsWindowController.shared.show()
             }
         }
     }

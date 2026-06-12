@@ -38,7 +38,9 @@ final class TrayAnimator {
     }
 
     /// PNG frames sorted by name (frame-00 … frame-NN), sized for the bar.
-    private static func loadFrames(directory: String) -> [NSImage] {
+    /// Internal so the settings window's menu-bar mock can render the same
+    /// frame sets.
+    static func loadFrames(directory: String) -> [NSImage] {
         let urls = Bundle.tokenBarResources.urls(
             forResourcesWithExtension: "png", subdirectory: directory) ?? []
         return urls
@@ -87,7 +89,9 @@ final class TrayAnimator {
                 coloring: coloring))
     }
 
-    private static let lastRemainingKey = "tokenbar.quota.lastRemaining"
+    /// Internal so the settings window's preview can fall back to the same
+    /// last-good reading before its own quota fetch lands.
+    static let lastRemainingKey = "tokenbar.quota.lastRemaining"
 
     /// Last successfully resolved remaining percent — a transient fetch
     /// failure (or a provider erroring) must never zero/blank the display.
