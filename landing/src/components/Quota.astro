@@ -1,0 +1,247 @@
+---
+// The menu-bar quota gauges, redrawn from TrayIcons.swift's 16-grid geometry
+// (popsicle v7: hugging dome, square shoulders, twin face grooves) — no
+// screenshots. The melt cycle is precomputed here at build time: each
+// keyframe's body outline comes from the exact Swift Bézier math (y flipped
+// for SVG), then CSS `d: path()` morphs between them. One 14s loop: hold →
+// melt through battery colors → puddle → the window resets and it refreezes.
+
+type Geom = {
+  d: string
+  gXL: number; gXR: number; gY: number; gH: number; gOp: number
+  dripCy: number; dripOp: number
+  puddleR: number; puddleOp: number
+  fill: string
+  level: number
+}
+
+// literal hex (not var()) so keyframe fills interpolate smoothly instead of
+// snapping discretely; values mirror TrayIcons.gaugeColor / --gauge-* exactly
+const gaugeFill = (r: number) => (r > 0.25 ? '#21c45e' : r > 0.1 ? '#f59e0b' : '#f04545')
+
+function popGeom(rIn: number): Geom {
+  const r = Math.max(0.001, Math.min(1, rIn))
+  const melt = 1 - r
+  const topY = 5 + 10 * r
+  const w = 2.6 + 5.4 * r
+  const half = w / 2
+  const capR = Math.min(1.8, (topY - 5) * 0.32)
+  const dip = 0.5 + 0.9 * melt
+  const sh = 0.12 * melt
+  // Swift draws y-up on the 16-grid; SVG is y-down
+  const pt = (x: number, y: number) => `${x.toFixed(3)} ${(16 - y).toFixed(3)}`
+  const d = [
+    `M ${pt(8 - half, 5.6)}`,
+    `C ${pt(8 - half * 0.5, 5.6 - dip)} ${pt(8 + half * 0.5, 5.6 - dip)} ${pt(8 + half, 5.6)}`,
+    `C ${pt(8 + half + 0.15, 5.6 + (topY - 5.6) * 0.5)} ${pt(8 + half - sh + 0.1, topY - capR)} ${pt(8 + half - sh - capR * 0.3, topY - capR * 0.2)}`,
+    `C ${pt(8 + half * 0.45, topY + capR * 0.3 - 0.25 * melt)} ${pt(8 - half * 0.45, topY + capR * 0.3 - 0.25 * melt)} ${pt(8 - half + sh + capR * 0.3, topY - capR * 0.2)}`,
+    `C ${pt(8 - half + sh - 0.1, topY - capR)} ${pt(8 - half - 0.15, 5.6 + (topY - 5.6) * 0.5)} ${pt(8 - half, 5.6)}`,
+    'Z',
+  ].join(' ')
+
+  const inset = w / 3.2
+  const gTop = topY - capR - 0.9
+  const gH = Math.max(0.01, gTop - 6.6)
+  const presence = r > 0.45 && gTop > 6.6 + 0.8 ? Math.min(1, (r - 0.45) / 0.4) : 0
+  const pw = melt > 0.3 ? 3 + (9 * (melt - 0.3)) / 0.7 : 0
+
+  return {
+    d,
+    gXL: +(8 - inset - 0.33).toFixed(3),
+    gXR: +(8 + inset - 0.33).toFixed(3),
+    gY: +(16 - gTop).toFixed(3),
+    gH: +gH.toFixed(3),
+    gOp: +(0.85 * presence).toFixed(3),
+    dripCy: +(11.15 + dip).toFixed(3),
+    dripOp: melt > 0.15 && r > 0.03 ? 0.7 : 0,
+    puddleR: +(pw / 2).toFixed(3),
+    puddleOp: pw > 0 ? 0.35 : 0,
+    fill: gaugeFill(r),
+    level: r,
+  }
+}
+
+// the melt timeline: hold full → drain through the battery palette → sit
+// melted → the 5-hour window resets and the bar refreezes
+const STEPS = [
+  { at: 0, r: 1 },
+  { at: 8, r: 1 },
+  { at: 26, r: 0.74 },
+  { at: 44, r: 0.48 },
+  { at: 58, r: 0.26 },
+  { at: 72, r: 0.08 },
+  { at: 84, r: 0.08 },
+  { at: 91, r: 0.6 },
+  { at: 96, r: 1 },
+  { at: 100, r: 1 },
+]
+
+const frames = (emit: (g: Geom) => string) =>
+  STEPS.map((s) => `${s.at}% { ${emit(popGeom(s.r))} }`).join('\n')
+
+const css = `
+@keyframes qpBody { ${frames((g) => `d: path("${g.d}"); fill: ${g.fill};`)} }
+@keyframes qpGrooveL { ${frames((g) => `x: ${g.gXL}px; y: ${g.gY}px; height: ${g.gH}px; opacity: ${g.gOp};`)} }
+@keyframes qpGrooveR { ${frames((g) => `x: ${g.gXR}px; y: ${g.gY}px; height: ${g.gH}px; opacity: ${g.gOp};`)} }
+@keyframes qpDrip { ${frames((g) => `cy: ${g.dripCy}px; opacity: ${g.dripOp}; fill: ${g.fill};`)} }
+@keyframes qpPuddle { ${frames((g) => `rx: ${Math.max(0.01, g.puddleR)}px; opacity: ${g.puddleOp}; fill: ${g.fill};`)} }
+@keyframes qpInk { ${frames((g) => `fill: ${g.fill};`)} }
+@keyframes qpStroke { ${frames((g) => `stroke: ${g.fill}; stroke-dashoffset: ${(100 - 100 * g.level).toFixed(1)};`)} }
+@keyframes qpSweep { ${frames((g) => `width: ${(16 * g.level).toFixed(2)}px;`)} }
+@keyframes qpDrop {
+  0%, 55% { opacity: 0; transform: translateY(0); }
+  60% { opacity: 0.45; transform: translateY(0); }
+  70% { opacity: 0.45; transform: translateY(2.4px); }
+  76% { opacity: 0; transform: translateY(3.2px); }
+  100% { opacity: 0; transform: translateY(0); }
+}
+.qstage .qp-anim { animation-duration: 14s; animation-iteration-count: infinite; animation-timing-function: linear; animation-play-state: paused; }
+.qstage.in .qp-anim { animation-play-state: running; }
+.qstage .qp-body { animation-name: qpBody; }
+.qstage .qp-gl { animation-name: qpGrooveL; }
+.qstage .qp-gr { animation-name: qpGrooveR; }
+.qstage .qp-drip { animation-name: qpDrip; }
+.qstage .qp-puddle { animation-name: qpPuddle; }
+.qstage .qp-ink { animation-name: qpInk; }
+.qstage .qp-ring-fill { animation-name: qpStroke; }
+.qstage .qp-sweep { animation-name: qpSweep; }
+.qstage .qp-drop { animation-name: qpDrop, qpInk; }
+`
+
+const g0 = popGeom(1)
+---
+
+<section class="section quota" id="quota">
+  <div class="container quota-grid">
+    <div class="section-head quota-copy reveal">
+      <p class="eyebrow">The menu bar is the dashboard</p>
+      <h2>Your quota,<br />melting in real time.</h2>
+      <p>
+        The status item can gauge what's left of your subscription window —
+        as signal bars, a ring, or a popsicle that melts as your five-hour
+        window drains. Battery-style colors kick in when it matters:
+        amber under 25%, red under 10%. Right-click picks which
+        subscription it tracks.
+      </p>
+      <p class="quota-note mono">drawn live on a 16px grid · same geometry as the app</p>
+    </div>
+
+    <div class="quota-stage glass qstage reveal" style="--rd:.12s">
+      <div class="gauges">
+        <figure class="gauge">
+          <svg viewBox="0 0 16 16" aria-label="Signal bars quota gauge">
+            <g class="track">
+              <rect x="0" y="10" width="3" height="5" rx="1.2" />
+              <rect x="4" y="7" width="3" height="8" rx="1.2" />
+              <rect x="8" y="4" width="3" height="11" rx="1.2" />
+              <rect x="12" y="1" width="3" height="14" rx="1.2" />
+            </g>
+            <clipPath id="qp-clip"><rect class="qp-anim qp-sweep" x="0" y="0" width="16" height="16" /></clipPath>
+            <g clip-path="url(#qp-clip)" class="qp-anim qp-ink" style={`fill: ${g0.fill}`}>
+              <rect x="0" y="10" width="3" height="5" rx="1.2" />
+              <rect x="4" y="7" width="3" height="8" rx="1.2" />
+              <rect x="8" y="4" width="3" height="11" rx="1.2" />
+              <rect x="12" y="1" width="3" height="14" rx="1.2" />
+            </g>
+          </svg>
+          <figcaption class="mono">signal bars</figcaption>
+        </figure>
+
+        <figure class="gauge big">
+          <svg viewBox="0 0 16 16" aria-label="Melting popsicle quota gauge">
+            <!-- stick: same ink, lighter layer -->
+            <rect x="7.25" y="4" width="1.5" height="10.5" rx="0.75" class="stick" />
+            <!-- runoff puddle -->
+            <ellipse class="qp-anim qp-puddle" cx="8" cy="14.8" rx="0.01" ry="0.7" style={`fill: ${g0.fill}; opacity: 0;`} />
+            <!-- the ice, grooves punched out via mask -->
+            <mask id="qp-grooves">
+              <rect x="-2" y="-2" width="20" height="20" fill="white" />
+              <rect class="qp-anim qp-gl" x={g0.gXL} y={g0.gY} width="0.66" height={g0.gH} rx="0.33" fill="black" style={`opacity: ${g0.gOp}`} />
+              <rect class="qp-anim qp-gr" x={g0.gXR} y={g0.gY} width="0.66" height={g0.gH} rx="0.33" fill="black" style={`opacity: ${g0.gOp}`} />
+            </mask>
+            <path class="qp-anim qp-body" d={g0.d} mask="url(#qp-grooves)" style={`fill: ${g0.fill}`} />
+            <!-- hanging drip + falling droplet -->
+            <ellipse class="qp-anim qp-drip" cx="9" cy={g0.dripCy} rx="0.5" ry="0.75" style={`fill: ${g0.fill}; opacity: 0;`} />
+            <ellipse class="qp-anim qp-drop" cx="7.125" cy="12.65" rx="0.425" ry="0.55" style={`fill: ${g0.fill}; opacity: 0;`} />
+          </svg>
+          <figcaption class="mono">melting popsicle</figcaption>
+        </figure>
+
+        <figure class="gauge">
+          <svg viewBox="0 0 16 16" aria-label="Ring quota gauge">
+            <circle class="track-ring" cx="8" cy="8" r="5.6" />
+            <g transform="translate(16 0) scale(-1 1)">
+              <circle
+                class="qp-anim qp-ring-fill" cx="8" cy="8" r="5.6"
+                pathLength="100" transform="rotate(-90 8 8)"
+                style={`stroke: ${g0.fill}`}
+              />
+            </g>
+          </svg>
+          <figcaption class="mono">ring gauge</figcaption>
+        </figure>
+      </div>
+      <p class="legend mono" aria-hidden="true">
+        <span class="sw ok"></span>on pace
+        <span class="sw warn"></span>&lt; 25% left
+        <span class="sw low"></span>&lt; 10% left
+      </p>
+    </div>
+  </div>
+
+  <Fragment set:html={`<style>${css}</style>`} />
+</section>
+
+<style>
+  .quota-grid {
+    display: grid; grid-template-columns: 0.95fr 1.05fr;
+    gap: clamp(32px, 5vw, 72px); align-items: center;
+  }
+  .quota-copy { margin-bottom: 0; }
+  .quota-note {
+    margin-top: 22px; font-size: 12.5px; color: var(--faint);
+    letter-spacing: .04em;
+  }
+
+  .quota-stage { padding: clamp(28px, 4vw, 48px) clamp(20px, 3vw, 40px) 24px; }
+  .gauges {
+    display: flex; align-items: flex-end; justify-content: center;
+    gap: clamp(20px, 4vw, 56px);
+  }
+  .gauge { display: grid; justify-items: center; gap: 14px; }
+  .gauge svg { width: clamp(64px, 9vw, 96px); height: auto; overflow: visible; }
+  .gauge.big svg { width: clamp(150px, 20vw, 220px); }
+  .gauge figcaption { font-size: 12px; color: var(--muted); letter-spacing: .08em; }
+  .gauge.big figcaption { color: var(--ink-dim); }
+
+  .gauge .track rect { fill: color-mix(in oklab, var(--ink) 30%, transparent); }
+  .gauge .stick { fill: color-mix(in oklab, var(--ink) 55%, transparent); }
+  .track-ring {
+    fill: none; stroke: color-mix(in oklab, var(--ink) 28%, transparent);
+    stroke-width: 2.6;
+  }
+  .qp-ring-fill {
+    fill: none; stroke-width: 2.6; stroke-linecap: round;
+    stroke-dasharray: 100 100; stroke-dashoffset: 0;
+  }
+
+  .legend {
+    margin-top: 26px; text-align: center; font-size: 12px; color: var(--muted);
+    display: flex; align-items: center; justify-content: center; gap: 8px 10px;
+    flex-wrap: wrap;
+  }
+  .legend .sw {
+    width: 10px; height: 10px; border-radius: 3px; display: inline-block;
+    margin-left: 14px;
+  }
+  .legend .sw:first-child { margin-left: 0; }
+  .legend .ok { background: var(--gauge-ok); }
+  .legend .warn { background: var(--gauge-warn); }
+  .legend .low { background: var(--gauge-low); }
+
+  @media (max-width: 880px) {
+    .quota-grid { grid-template-columns: 1fr; }
+    .gauge svg { width: clamp(52px, 14vw, 72px); }
+    .gauge.big svg { width: clamp(130px, 36vw, 180px); }
+  }
+</style>

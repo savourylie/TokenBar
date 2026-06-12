@@ -2,7 +2,7 @@
 const faqs = [
   {
     q: 'What exactly is TokenBar?',
-    a: 'A free, open-source macOS menu-bar app that reads your local AI coding session logs and shows what you’re spending — across a contribution graph, per-model and per-agent breakdowns, daily and hourly views, and live throughput. No CLI to run, no account.',
+    a: 'A free, open-source native macOS menu-bar app that reads your local AI coding session logs and shows what you’re spending — across a contribution graph, per-model and per-agent breakdowns, daily and hourly views, and live throughput. No CLI to run, no account.',
   },
   {
     q: 'Which AI coding tools does it track?',
@@ -13,16 +13,20 @@ const faqs = [
     a: 'No. TokenBar is MIT-licensed and free — no subscription, no paid tier, no telemetry.',
   },
   {
-    q: 'What is the native beta?',
-    a: 'A ground-up Swift rewrite of TokenBar — SwiftUI shell, Liquid Glass on macOS 26, SceneKit 3D, Sparkle updates — around the same Rust parsing core. It installs as a separate “TokenBar Beta” app, so you can run it alongside stable. It becomes TokenBar v1.0.0 once the beta settles.',
+    q: 'What happened to the original (Tauri) app?',
+    a: 'TokenBar began as a Tauri fork of tokcat. With v1.0.0 (June 2026) it was replaced by a ground-up Swift rewrite around the same Rust parsing core — the `tokenbar` cask now installs the native app, and the Tauri repository is archived. A `tokenbar@legacy` cask pins the final Tauri build (v0.4.5) for macOS 11+.',
+  },
+  {
+    q: 'How do updates work?',
+    a: 'In-app, over a signed Sparkle feed — each release is signature-verified before install, with release notes summarized from the actual commits. Want beta builds? It’s a toggle in Settings, not a separate install.',
   },
   {
     q: 'Where does my data go?',
-    a: 'Nowhere. Usage history is read locally from disk. Network requests are limited to the signed updater manifest, public model-pricing data, and optional Codex/Claude quota lookups using the OAuth credentials already on your machine.',
+    a: 'Nowhere. Usage history is read locally from disk. Network requests are limited to the signed updater feed, public model-pricing data, and optional Codex/Claude quota lookups using the OAuth credentials already on your machine — that’s what powers the menu-bar quota gauge and the agent limit cards.',
   },
   {
     q: 'Intel Mac or Windows?',
-    a: 'TokenBar targets Apple Silicon (arm64). Stable runs on macOS 11+, the native beta on macOS 14+ (Liquid Glass needs macOS 26). There’s no Intel, Windows, or Linux build.',
+    a: 'TokenBar targets Apple Silicon (arm64) on macOS 14+; Liquid Glass needs macOS 26, earlier systems get a vibrancy fallback. The legacy Tauri build covers macOS 11+. There’s no Intel, Windows, or Linux build.',
   },
   {
     q: 'How do I uninstall it?',
@@ -33,12 +37,12 @@ const faqs = [
 
 <section class="section faq">
   <div class="container faq-grid">
-    <div class="section-head faq-head">
+    <div class="section-head faq-head reveal">
       <p class="eyebrow">Questions</p>
       <h2>Good to know.</h2>
       <p>The short answers most people want before installing.</p>
     </div>
-    <div class="faq-list">
+    <div class="faq-list glass reveal" style="--rd:.1s">
       {faqs.map((f, i) => (
         <details open={i === 0}>
           <summary>
@@ -54,21 +58,20 @@ const faqs = [
 
 <style>
   .faq-grid { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: clamp(28px, 5vw, 64px); align-items: start; }
-  .faq-head { position: sticky; top: 28px; margin-bottom: 0; }
-  .faq-list { display: grid; gap: 12px; }
-  details {
-    border: 1px solid var(--line); border-radius: var(--radius-sm);
-    background: color-mix(in oklab, var(--panel) 55%, transparent);
-    padding: 4px 20px; transition: border-color .18s;
-  }
-  details[open] { border-color: var(--line-strong); }
+  .faq-head { position: sticky; top: 58px; margin-bottom: 0; }
+  /* one glass panel for the whole list — stacking blur per row is how you
+     get the murky-slab look (and jank); dividers carry the rhythm instead */
+  .faq-list { padding: 8px 24px; }
+  details { transition: background .18s; border-radius: var(--radius-sm); }
+  details + details { border-top: 1px solid var(--line); }
+  details[open] { background: color-mix(in oklab, var(--ink) 4%, transparent); margin: 0 -10px; padding: 0 10px; }
   summary {
     list-style: none; cursor: pointer; padding: 16px 0;
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
     font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em;
   }
   summary::-webkit-details-marker { display: none; }
-  .chev { width: 12px; height: 12px; border-right: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(45deg); transition: transform .2s; flex: 0 0 auto; }
+  .chev { width: 12px; height: 12px; border-right: 2px solid var(--accent-bright); border-bottom: 2px solid var(--accent-bright); transform: rotate(45deg); transition: transform .2s; flex: 0 0 auto; }
   details[open] .chev { transform: rotate(-135deg); }
   details p { color: var(--muted); font-size: 15px; padding: 0 0 18px; max-width: 62ch; }
 

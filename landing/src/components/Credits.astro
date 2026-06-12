@@ -33,14 +33,14 @@ const credits = [
 
 <section class="section credits">
   <div class="container">
-    <div class="section-head">
+    <div class="section-head reveal">
       <p class="eyebrow">Standing on shoulders</p>
       <h2>Built on great open source.</h2>
       <p>TokenBar wouldn’t exist without these projects — thank you to their maintainers.</p>
     </div>
     <div class="credit-grid">
-      {credits.map((c) => (
-        <a class="credit-card" href={c.href} style={`--ac: var(${c.accent});`}>
+      {credits.map((c, i) => (
+        <a class="credit-card glass reveal" href={c.href} style={`--ac: var(${c.accent}); --rd: ${(i % 2) * 0.09}s;`}>
           <div class="ch">
             <h3>{c.name}</h3>
             <span class="who mono">{c.who}</span>
@@ -55,12 +55,12 @@ const credits = [
 
 <style>
   .credit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-  .credit-card {
-    display: block; padding: 30px 28px; border-radius: var(--radius);
-    border: 1px solid var(--line); background: color-mix(in oklab, var(--panel) 60%, transparent);
-    transition: transform .2s, border-color .2s, box-shadow .2s;
+  .credit-card { display: block; padding: 30px 28px; }
+  .credit-card:hover {
+    border-color: color-mix(in oklab, var(--ac) 55%, var(--glass-edge));
+    box-shadow: inset 0 1px 0 var(--glass-sheen),
+      0 26px 50px -34px color-mix(in oklab, var(--ac) 60%, transparent);
   }
-  .credit-card:hover { transform: translateY(-4px); border-color: color-mix(in oklab, var(--ac) 55%, var(--line)); box-shadow: 0 26px 50px -34px color-mix(in oklab, var(--ac) 60%, transparent); }
   .ch { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
   .ch h3 { font-size: 26px; color: var(--ac); }
   .who { font-size: 13px; color: var(--faint); }

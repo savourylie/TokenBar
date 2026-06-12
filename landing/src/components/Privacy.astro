@@ -20,14 +20,14 @@ const pillars = [
 
 <section class="section privacy" id="privacy">
   <div class="container">
-    <div class="section-head">
+    <div class="section-head reveal">
       <p class="eyebrow">Local-first by construction</p>
       <h2>Your spend stays on your Mac.</h2>
       <p>TokenBar is built so the honest answer to “where does my data go?” is: nowhere.</p>
     </div>
     <div class="pillars">
-      {pillars.map((p) => (
-        <div class="pillar">
+      {pillars.map((p, i) => (
+        <div class="pillar glass reveal" style={`--rd: ${i * 0.09}s;`}>
           <span class="k mono">{p.k}</span>
           <h3>{p.title}</h3>
           <p>{p.body}</p>
@@ -39,12 +39,7 @@ const pillars = [
 
 <style>
   .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-  .pillar {
-    padding: 28px 26px; border-radius: var(--radius);
-    border: 1px solid var(--line);
-    background: color-mix(in oklab, var(--panel) 60%, transparent);
-    position: relative;
-  }
+  .pillar { padding: 28px 26px; }
   .pillar .k {
     font-size: 13px; color: var(--accent); letter-spacing: .1em;
     display: block; margin-bottom: 18px;
