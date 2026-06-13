@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  actions: write   # the badge step dispatches update-install-count.yml
 
 jobs:
   release:
@@ -108,6 +109,8 @@ jobs:
       # `on: release` never fires downstream for GITHUB_TOKEN-created
       # releases (recursion guard) — dispatch the badge refresh explicitly.
       - name: Refresh install-count badge
+        # Non-critical chore — never let it gate the Homebrew cask bump below.
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run update-install-count.yml --ref main
