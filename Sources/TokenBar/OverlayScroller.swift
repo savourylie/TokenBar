@@ -5,52 +5,64 @@ import SwiftUI
 /// at rest, a translucent pill while scrolling, and a brief flash when the
 /// popover opens so users learn the content scrolls. The system-wide "always
 /// show scroll bars" preference would otherwise pin the legacy track — the
-/// ugliest strip in the popover — and fully hiding indicators loses the
-/// scroll affordance entirely.
+/// thick, permanently-visible strip — which is exactly the bug some users hit
+/// after a relaunch.
+///
+/// The earlier version re-asserted only from `DispatchQueue.main.async` (in
+/// makeNSView/updateNSView). On some launches that ran before the backing
+/// view was in the scroll-view hierarchy, the lookup bailed, and nothing
+/// re-asserted — leaving the legacy scroller stuck. This version pins the
+/// style from `viewDidMoveToWindow` (fires every popover open, *after* the
+/// view is attached, so `enclosingScrollView` is valid), re-pins on every
+/// SwiftUI pass, and re-pins when the system preference flips.
 struct OverlayScrollerEnforcer: NSViewRepresentable {
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> EnforcerView { EnforcerView() }
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { context.coordinator.apply(from: view) }
-        // The system flips styles back when the global preference changes;
-        // re-assert whenever that happens.
-        NotificationCenter.default.addObserver(
-            forName: NSScroller.preferredScrollerStyleDidChangeNotification,
-            object: nil, queue: .main
-        ) { [weak view, coordinator = context.coordinator] _ in
-            MainActor.assumeIsolated {
-                if let view { coordinator.apply(from: view) }
-            }
-        }
-        return view
-    }
-
-    func updateNSView(_ view: NSView, context: Context) {
-        DispatchQueue.main.async { context.coordinator.apply(from: view) }
-    }
+    func updateNSView(_ view: EnforcerView, context: Context) { view.enforce() }
 
     @MainActor
-    final class Coordinator {
-        private var flashedWindow: ObjectIdentifier?
+    final class EnforcerView: NSView {
+        private var registeredPrefObserver = false
+        private var flashedInWindow = false
 
-        func apply(from view: NSView) {
-            var candidate: NSView? = view
-            while let current = candidate, !(current is NSScrollView) {
-                candidate = current.superview
+        override func viewWillMove(toWindow newWindow: NSWindow?) {
+            super.viewWillMove(toWindow: newWindow)
+            // Leaving a window arms the one-shot flash for the next appearance.
+            if newWindow == nil { flashedInWindow = false }
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            enforce()
+        }
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            enforce()
+            guard !registeredPrefObserver else { return }
+            registeredPrefObserver = true
+            // The system flips styles back when the global preference changes;
+            // re-assert whenever that happens.
+            NotificationCenter.default.addObserver(
+                forName: NSScroller.preferredScrollerStyleDidChangeNotification,
+                object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.enforce() }
             }
-            guard let scroll = candidate as? NSScrollView else { return }
+        }
+
+        /// Pin overlay style on the enclosing scroll view and flash once per
+        /// window appearance — idempotent, so every render pass can call it.
+        func enforce() {
+            guard let scroll = enclosingScrollView else { return }
             scroll.scrollerStyle = .overlay
             scroll.autohidesScrollers = true
-            // Flash exactly once per window appearance — updateNSView fires
-            // on every SwiftUI pass (the 10s rate poll alone re-runs it), and
-            // re-flashing kept summoning the scroller back from its fade.
-            guard let window = scroll.window else { return }
-            let identity = ObjectIdentifier(window)
-            if flashedWindow != identity {
-                flashedWindow = identity
-                scroll.flashScrollers()
-            }
+            // Flash exactly once per appearance — updateNSView fires on every
+            // SwiftUI pass (the 10s rate poll alone re-runs it), and re-flashing
+            // kept summoning the scroller back from its fade.
+            guard scroll.window != nil, !flashedInWindow else { return }
+            flashedInWindow = true
+            scroll.flashScrollers()
         }
     }
 }
