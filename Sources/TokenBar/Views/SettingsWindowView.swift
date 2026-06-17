@@ -36,6 +36,7 @@ struct SettingsWindowView: View {
         .task { await model.load() }
         .task { await model.pollAgentUsage() }
         .task { await model.pollTrace() }
+        .task { await model.pollGraph() }
         .task { await pollTokensPerMin() }
     }
 

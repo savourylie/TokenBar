@@ -119,6 +119,49 @@ enum AppView: String, CaseIterable {
         phase = .ready
     }
 
+    /// Periodically re-derive every loaded lens so the popover advances while
+    /// it stays open. The SwiftUI view is built once (StatusItemController
+    /// keeps a single NSHostingController across every transient open/close),
+    /// so `.task { load() }` runs only once per process — without this loop the
+    /// overview bars never pick up today's usage until a manual Refresh. Uses
+    /// the non-forced graph() path: the staticlib's mtime-aware cache makes
+    /// idle ticks cheap and only re-aggregates when logs actually change.
+    /// Keeps stale data on error (only assigns on success).
+    func pollGraph() async {
+        while !Task.isCancelled {
+            // Sleep first: load()'s initial fetch already covers t=0.
+            try? await Task.sleep(for: .seconds(60))
+            if Task.isCancelled { break }
+            // Don't race an in-flight manual Refresh or year switch.
+            guard !refreshing else { continue }
+            let year = self.year
+            async let payloadTask = Task.detached(priority: .utility) {
+                try? TBCore.graph(year: year)
+            }.value
+            async let reportTask = Task.detached(priority: .utility) {
+                try? TBCore.modelReport(year: year)
+            }.value
+            let fetched = await payloadTask
+            let report = await reportTask
+            if Task.isCancelled { break }
+            // The year may have changed while we were off-actor; drop a stale
+            // slice so the chart never flickers to the wrong year.
+            guard self.year == year, let payload = fetched else { continue }
+            apply(payload: payload, report: report)
+            // Re-fetch the lazy lenses that were already loaded (mirrors reload).
+            if hourly != nil {
+                hourly = await Task.detached(priority: .utility) {
+                    try? TBCore.hourlyReport(year: year)
+                }.value
+            }
+            if agents != nil {
+                agents = await Task.detached(priority: .utility) {
+                    try? TBCore.agentsReport(year: year)
+                }.value
+            }
+        }
+    }
+
     /// Poll the OAuth quota snapshots while the popover is open. The fetch is
     /// network-bound (up to ~30s when a provider hangs), so failures keep the
     /// previous payload; per-provider errors live inside each snapshot.

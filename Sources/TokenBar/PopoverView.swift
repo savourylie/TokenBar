@@ -72,6 +72,7 @@ struct PopoverView: View {
         .task { await pollTokensPerMin() }
         .task { await model.pollAgentUsage() }
         .task { await model.pollTrace() }
+        .task { await model.pollGraph() }
         .onAppear { installKeyMonitors() }
         .onDisappear { removeKeyMonitors() }
     }
