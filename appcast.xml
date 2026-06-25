@@ -12,7 +12,7 @@
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <description><![CDATA[<b>Fixes:</b>
 <ul>
-<li>The dashboard popover no longer briefly shows "Loading usage..." when reopened; it now instantly displays current data and correctly reflects year changes, even if the Settings window is left open.</li>
+<li>Reopening the dashboard now reliably shows the correct data: it keeps your selected year, no longer shows a previous year's numbers, and keeps the live activity and quota cards populated.</li>
 </ul>
 ]]></description>
             <enclosure url="https://github.com/Nanako0129/TokenBar/releases/download/v1.1.4/TokenBar.app.tar.gz" length="7070011" type="application/octet-stream" sparkle:edSignature="fa1zEEFwirhzxUE4k3ASTeGhhXoHVLqku8xg2lG4SFAvlDjVwq8yXTOxC2RW6RYF+49ummJnnt25VHLYDDIqCg=="/>
