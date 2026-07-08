@@ -70,13 +70,6 @@ struct SettingsWindowView: View {
                     reorderable: true)
             }
 
-            section("Client tabs (top bar preview + controls)") {
-                SettingsPanel(
-                    agentUsage: model.agentUsage,
-                    presentClients: model.stats?.presentClients ?? []
-                )
-            }
-
             section("Live session card") {
                 UsageTraceCard(buckets: model.trace, windowSecs: 600)
             }

@@ -125,4 +125,19 @@ public enum ClientRegistry {
         out.insert(from, at: fromI < toI ? anchor + 1 : anchor)
         return out
     }
+
+    /// One-time migration: the Agent-limits drag order used to persist under
+    /// "tokenbar.limits.order". It now shares `tabOrderKey` with the client tab
+    /// bar, so fold an existing legacy value across once — otherwise upgrading
+    /// users would silently lose their saved card arrangement. Idempotent: only
+    /// fires when the new key is unset and a non-empty legacy value exists.
+    public static func migrateLegacyOrderKey() {
+        let defaults = UserDefaults.standard
+        let legacyKey = "tokenbar.limits.order"
+        guard defaults.object(forKey: tabOrderKey) == nil,
+              let legacy = defaults.string(forKey: legacyKey),
+              !legacy.isEmpty
+        else { return }
+        defaults.set(legacy, forKey: tabOrderKey)
+    }
 }
