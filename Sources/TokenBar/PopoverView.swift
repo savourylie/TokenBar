@@ -37,29 +37,27 @@ struct PopoverView: View {
             set: { activeViewRaw = $0.rawValue })
     }
 
+    /// Client ids shown in the top tab bar: present clients minus the user's
+    /// hidden set, in their saved order. Drives both the tab row and the
+    /// fall-back-to-Overview guard (see `.onChange` below).
+    private var displayClients: [String] {
+        ClientRegistry.displayClients(present: model.stats?.presentClients ?? [])
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
             if BridgeBuild.isActive && !bridgeDismissed {
                 bridgeBanner
             }
-            if let stats = model.stats {
-                let displayClients = ClientRegistry.displayClients(present: stats.presentClients)
-                // Show the tabs row (which always starts with Overview) as soon as there is client data.
-                // This ensures Overview is visible alongside the clients.
-                if !displayClients.isEmpty {
-                    DashboardTabs(
-                        clients: displayClients, active: $activeTab,
-                        kbdHints: cmdHeld)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 8)
-                }
-                // If the active tab was hidden by user preference, fall back (side-effect)
-                let _ = {
-                    if activeTab != "overview" && !displayClients.contains(activeTab) {
-                        activeTab = "overview"
-                    }
-                }()
+            // Show the tabs row (which always starts with Overview) as soon as
+            // there is client data, so Overview is visible alongside the clients.
+            if !displayClients.isEmpty {
+                DashboardTabs(
+                    clients: displayClients, active: $activeTab,
+                    kbdHints: cmdHeld)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
             }
             ViewSwitch(active: activeView)
                 .padding(.horizontal, 12)
@@ -105,13 +103,26 @@ struct PopoverView: View {
             }
         }
         .onDisappear { removeKeyMonitors() }
-        // Reset a stale persisted tab whenever the loaded client set changes —
+        // Reset a stale persisted tab whenever the displayed client set changes —
         // attached to the always-present root, not the tab row (which is hidden
         // when only one client is present), so a saved client id that no longer
-        // exists can't strand the dashboard on an empty single-client slice
-        // with no visible tab row to return to Overview.
-        .onChange(of: model.stats?.presentClients) { _, clients in
-            if activeTab != "overview", let clients, !clients.contains(activeTab) {
+        // exists (or that the user just hid from the top tabs) can't strand the
+        // dashboard on an empty slice with no visible tab row to return to
+        // Overview. `initial: true` also catches a tab persisted-then-hidden
+        // across a relaunch. Keyed on displayClients (not presentClients) so a
+        // hide toggle — which leaves the client in presentClients — still fires.
+        .onChange(of: model.stats?.presentClients, initial: true) { _, present in
+            // Keyed on presentClients (the load signal), NOT displayClients:
+            // when every client is hidden, displayClients stays [] across the
+            // nil->loaded transition, so an onChange on it would never fire and
+            // a persisted tab would strand on a hidden slice. presentClients
+            // still deltas on load. The `guard` skips the pre-load nil fire so a
+            // persisted tab isn't reset to Overview before data arrives
+            // (defeating tokenbar.activeTab's cross-launch memory). Membership is
+            // judged against displayClients so hiding the active tab — which
+            // leaves it in presentClients — still falls back to Overview.
+            guard present != nil else { return }
+            if activeTab != "overview", !displayClients.contains(activeTab) {
                 activeTab = "overview"
             }
         }
