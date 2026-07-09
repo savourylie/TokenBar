@@ -39,6 +39,11 @@ jobs:
         env:
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL || 'https://tokenbar.nyanako.com' }}
       - uses: actions/configure-pages@v5
+        with:
+          # Enable Pages (build source = GitHub Actions) on first run if the repo
+          # doesn't have it yet, using the pages:write permission above — avoids a
+          # manual Settings toggle and the "Get Pages site failed (404)" error.
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: landing/dist
