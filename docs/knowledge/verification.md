@@ -131,8 +131,11 @@ Live account-scope smoke必須在hermetic security suite通過後才執行，且
 > 凡是驗收由偏好驅動的畫面——**usage attribution 宣告、Settings 持久化、狀態列項目狀態**——一律用 bundle，但**必須指定一次性的 bundle identifier**：
 >
 > ```bash
+> defaults write com.nyanako.tokenbar.uxcheck tokenbar.migratedFromBeta -bool true
 > BUNDLE_ID=com.nyanako.tokenbar.uxcheck make bundle
 > ```
+>
+> **第一行不可省。** `AppDelegate.swift:69` 在任何東西讀 defaults 之前呼叫 `BetaMigration.runIfNeeded()`，而它只用**當前網域**裡的 `tokenbar.migratedFromBeta` 當守門（`BetaMigration.swift:17-27`），不看 bundle identifier。所以任何全新網域第一次啟動都會被灌入 `com.nyanako.tokenbar.beta` 的全部 `tokenbar.*` 值。先把 marker 設起來，那次匯入就不會發生。這不是假想情況——開發機上那個 beta 網域通常還在。
 >
 > **走 `make bundle`，不要直接叫 `scripts/bundle.sh`**：`Makefile:95-99` 會先跑 `relink_if_stale` 與 `rebuild_if_header_stale`，而該 script 只跑 `swift build -c release`。少了那兩道，改完 Rust 或 `ctb.h` 之後 SwiftPM 會沉默地沿用舊執行檔或舊 CTB module（理由寫在 `Makefile:101-121`），於是你驗到的是上一版的行為卻以為驗過了。`BUNDLE_ID` 由環境傳入，`make` 會原樣轉給 script。
 >
