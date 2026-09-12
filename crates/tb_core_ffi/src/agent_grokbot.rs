@@ -266,10 +266,17 @@ pub(crate) fn map_response(body: &str, now: DateTime<Utc>) -> Result<GrokBotData
     {
         return Err("Grok Bot usage is unavailable. Open Grok Bot, then refresh.".to_string());
     }
-    if obj
-        .get("usesPooledEnterpriseAllowance")
-        .and_then(Value::as_bool)
-        == Some(true)
+    // Both spellings, like every other field below. The dashboard has been
+    // observed returning the snake_case shape, and reading only camelCase here
+    // publishes a pooled team allowance as an individual weekly quota — the
+    // one response this mapper must refuse outright.
+    if first_bool(
+        obj,
+        &[
+            "usesPooledEnterpriseAllowance",
+            "uses_pooled_enterprise_allowance",
+        ],
+    ) == Some(true)
     {
         return Err(
             "Grok Bot uses a pooled team allowance; no individual weekly quota is available."
@@ -320,6 +327,11 @@ pub(crate) fn map_response(body: &str, now: DateTime<Utc>) -> Result<GrokBotData
 fn first_f64(obj: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<f64> {
     keys.iter()
         .find_map(|k| obj.get(*k).and_then(Value::as_f64))
+}
+
+fn first_bool(obj: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<bool> {
+    keys.iter()
+        .find_map(|k| obj.get(*k).and_then(Value::as_bool))
 }
 
 /// Accept ISO-8601 strings and epoch seconds-or-milliseconds (number or
@@ -1113,6 +1125,20 @@ mod tests {
             r#"{
             "usagePercent": 25, "nextResetTimestampUtc": "2026-09-15T15:40:06Z",
             "usesPooledEnterpriseAllowance": true
+        }"#,
+            now()
+        )
+        .unwrap_err()
+        .contains("pooled team allowance"));
+        // The snake_case shape, which every other field in this mapper already
+        // accepts. Reading only camelCase published a pooled team allowance as
+        // an individual weekly quota — the meter parses fine, so the response
+        // is accepted rather than rejected and the user is shown a number that
+        // is not theirs. Both spellings must refuse.
+        assert!(map_response(
+            r#"{
+            "usage_percent": 25, "next_reset_timestamp_utc": "2026-09-15T15:40:06Z",
+            "uses_pooled_enterprise_allowance": true
         }"#,
             now()
         )

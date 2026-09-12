@@ -4,8 +4,8 @@ id: kb-plan-provider-quota-pace
 kind: plan
 scope: repository
 read_when: implementing or reviewing pace duration and historical pace for provider quota cards
-last_verified: 2026-08-28
-sources: ["crates/tb_core_ffi/src/agent_quota_history.rs", "crates/tb_core_ffi/src/agent_usage.rs", "crates/tb_core_ffi/src/agent_antigravity.rs", "crates/tb_core_ffi/src/agent_copilot.rs", "crates/tb_core_ffi/src/agent_grok.rs", "Sources/TokenBarCore/AgentUsage.swift", "Sources/TokenBarCore/UsagePace.swift", "Sources/TokenBar/TrayAnimator.swift", "Sources/TokenBar/DashboardModel.swift", "docs/knowledge/plans/codex-historical-pace-v2.md", "docs/knowledge/architecture.md", "docs/knowledge/verification.md", "public TokenBar-Windows PR #7", "public TokenBar PR #114", "public TokenBar-Windows PR #12", "official GitHub Copilot billing documentation", "official Claude usage credits documentation"]
+last_verified: 2026-09-08
+sources: ["crates/tb_core_ffi/src/agent_quota_history.rs", "crates/tb_core_ffi/src/agent_usage.rs", "crates/tb_core_ffi/src/agent_antigravity.rs", "crates/tb_core_ffi/src/agent_copilot.rs", "crates/tb_core_ffi/src/agent_grok.rs", "crates/tb_core_ffi/src/agent_opencode_go.rs", "crates/tb_core_ffi/src/opencode_integrations.rs", "Sources/TokenBar/Views/AgentLimitsCard.swift", "Sources/TokenBarCore/UsageAttributionSettings.swift", "Sources/TokenBarCore/AgentUsage.swift", "Sources/TokenBarCore/UsagePace.swift", "Sources/TokenBar/TrayAnimator.swift", "Sources/TokenBar/DashboardModel.swift", "docs/knowledge/plans/codex-historical-pace-v2.md", "docs/knowledge/architecture.md", "docs/knowledge/verification.md", "public TokenBar-Windows PR #7", "public TokenBar PR #114", "public TokenBar-Windows PR #12", "official GitHub Copilot billing documentation", "official Claude usage credits documentation"]
 ---
 
 # Provider-wide quota pace plan
@@ -57,7 +57,7 @@ sources: ["crates/tb_core_ffi/src/agent_quota_history.rs", "crates/tb_core_ffi/s
 | Cross-language | Rust JSON、C contract comment、Swift decoder／presentation、Windows handoff fixture | 未經另行授權修改 TokenBar-Windows |
 | Integration | 可審查的 Mac 實作與完整本機驗證計畫 | Push、PR、merge、tag、appcast 或 Homebrew release |
 
-`OpenCode` 只提供 Copilot authentication，不是獨立 quota provider。Antigravity local IDE與 remote OAuth都是同一 provider，但 current auth evidence不能安全證明兩條 route屬於同一 account；因此兩邊都支援 pace，卻保持 account-scope隔離，直到 authenticated provider ID能證明同一 owner。安全 fragmentation優先於跨帳號污染。
+`OpenCode` 過去只提供 Copilot authentication，不是獨立 quota provider。**此凍結決定已更新，不是無聲更動**（ported from mana.bar 的 OpenCode Go provider）：OpenCode Go plan 用 `auth.json` 的 `opencode-go` api key（`type: "api"`）呼叫 `/zen/go/v1/usage`，回報 rolling／weekly／monthly 三個 percentage window。因此 `opencode` client 現在同時是 router（計入它簽入的 oauth subscriptions）與自有 quota provider。此 quota 以 `client_id = "opencode"` 掛在既有 `opencode` client 與 tab，和 Copilot quota 掛在 `copilot` tab 同一模式，不新增 tab；`AgentLimitsCard` 的 opencode-router 分支因此先列自有 window card，再列它 route 的 subscriptions。window 目前不帶 duration evidence，pace 走 learning-duration lifecycle。Antigravity local IDE與 remote OAuth都是同一 provider，但 current auth evidence不能安全證明兩條 route屬於同一 account；因此兩邊都支援 pace，卻保持 account-scope隔離，直到 authenticated provider ID能證明同一 owner。安全 fragmentation優先於跨帳號污染。
 
 ## 目前缺口
 
@@ -120,7 +120,7 @@ Security review 與 2026-07-17 live prompt 後的修訂已把 Mac protocol 鎖�
 
 > **產品決策（2026-08-07，owner 拍板）：** pace 曲線模型的是「這個人如何在一個 window 內消耗額度」，那是操作者的性質，不是帳單歸屬的屬性。**分得出來就分，分不出來就不要硬分。**
 >
-> 接受的後果：在沒有 authoritative ID 的 provider 上，同一台機器的兩個帳號共用一條 pace series。影響 Claude 全部路線、Grok、Copilot、Antigravity remote，以及 `ChatGPT-Account-Id` 缺席時的 Codex。
+> 接受的後果：在沒有 authoritative ID 的 provider 上，同一台機器的兩個帳號共用一條 pace series。影響 Claude 全部路線、Grok、Copilot、Kiro、OpenCode Go、Antigravity remote，以及 `ChatGPT-Account-Id` 缺席時的 Codex。
 >
 > 一併接受的模型代價：series 存的是 `usedPercent` 對 phase，同一個人在不同規模的方案上斜率不同，合併會讓曲線失真。判斷是「失真的模型遠勝於永遠學不起來的模型」。**刻意不把 plan tier 放進 `windowKey`**，那會重新引入碎片化。
 >
@@ -137,9 +137,12 @@ Antigravity local IDE 的 email 來自 authenticated `GetUserStatus`，可走 au
 | Codex | 成功 usage response 前實際送出的 `ChatGPT-Account-Id`，缺少時使用 lineage；ID-token email 只供 presentation |
 | Claude | Current payload沒有 bound owner ID；主 config directory 的所有 login／setup-token paths 仍使用 lineage。**例外(2026-08-23)**:以 `CLAUDE_CONFIG_DIR` 隔離的額外帳號走 authoritative route,identifier 為該目錄的絕對路徑。該路徑不是「與憑證無關的本機狀態」——它**選擇**憑證,因為讀取的 Keychain service 就是 `Claude Code-credentials-<sha256(path)[..8]>`。此綁定**僅在 Keychain 那條路徑成立**:`fetch_claude_inner` 另有四條來源(env token、login-shell harvest、`TOKENBAR_*`、主目錄檔案、固定 service),皆非由目錄選出,故額外帳號的憑證若來自其中任一,**不得寫入 durable history**(fail closed,卡片仍顯示)。主目錄的推導一個位元都沒有改變 |
 | Grok | Current billing response沒有 owner ID；`auth.x.ai` entry的 email只供 presentation，history使用 lineage |
+| Grok Bot | Authoritative，且只在 server 接受該 request 之後才取：desktop login 取 access token JWT 的 `sub` claim，Cursor fallback 取其 `user_id`；兩者都與 selected team 一起編碼，因此換 team 不會把兩段歷史混進同一身分。取不到 owner 時 fail closed 成 `None`——保留額度卡片，但不以 installation-wide 身分寫入 durable history。Token rotation 不得拆開歷史，故 fingerprint 走 HMAC 而非 raw token（`agent_account_scope::resolve_credential`） |
 | Antigravity local IDE | Authenticated `GetUserStatus` email；缺席時 fail closed |
 | Antigravity remote OAuth | Google credential lineage；忽略 unbound active-email state |
 | Copilot | OpenCode GitHub credential lineage；本 Plan不新增 `/user` request |
+| Kiro | `getUsageLimits` response沒有 owner ID；kiro-cli SQLite entry與 Kiro IDE token file 兩個來源都走 credential lineage，history使用 provider-only 常數。IDE token file 的 `profileArn` 只用來 scope request，不作為 identity |
+| OpenCode Go | `/zen/go/v1/usage` response沒有 owner ID；`opencode-go` api key 走 credential lineage，history使用 provider-only 常數 |
 
 #### Installation key and HMAC
 
