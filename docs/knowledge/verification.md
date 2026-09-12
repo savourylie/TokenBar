@@ -132,9 +132,10 @@ Live account-scope smoke必須在hermetic security suite通過後才執行，且
 >
 > ```bash
 > # 驗收前：先退出 /Applications/TokenBar.app，兩者同網域不可並行
-> BACKUP=~/tokenbar-prefs-$(date +%Y%m%d-%H%M%S).plist
-> defaults export com.nyanako.tokenbar "$BACKUP"
-> test -s "$BACKUP" && echo "備份完成：$BACKUP"   # 沒印出來就不要往下做
+> BACKUP=$(mktemp ~/tokenbar-prefs-XXXXXX)
+> defaults export com.nyanako.tokenbar "$BACKUP" \
+>   && plutil -lint "$BACKUP" \
+>   && echo "備份完成：$BACKUP"   # 沒印出來就不要往下做
 >
 > # ……驗收……
 >
@@ -142,12 +143,14 @@ Live account-scope smoke必須在hermetic security suite通過後才執行，且
 > osascript -e 'quit app "TokenBar"' 2>/dev/null || true
 > while pgrep -f 'dist/TokenBar.app' >/dev/null; do sleep 1; done
 > # 備份不可用就停手：寧可留著髒偏好，也不要刪掉沒有備份的網域
-> test -s "$BACKUP" \
+> plutil -lint "$BACKUP" \
 >   && defaults delete com.nyanako.tokenbar \
 >   && defaults import com.nyanako.tokenbar "$BACKUP"
 > ```
 >
-> **備份檔名每次不同、而且 `delete` 綁在 `test -s` 後面，兩者都不是裝飾。** `defaults delete` 是破壞性的；若備份因為路徑不可寫或磁碟滿而失敗，而刪除仍照跑，結果是使用者的正式偏好被清掉且無從還原，或被上一次跑剩的舊備份蓋回去。所以檔名帶時間戳（不會沿用陳舊備份），而刪除只在備份確實存在且非空時才發生。跨終端機做驗收時把印出來的那個路徑帶著。
+> **`mktemp` 與兩次 `plutil -lint` 都不是裝飾。** `defaults delete` 是破壞性的；若備份失敗而刪除仍照跑，結果是使用者的正式偏好被清掉且無從還原，或被上一次跑剩的舊檔蓋回去。三個環節各擋一種失敗，沒有一個能取代另一個：`mktemp` 保證檔名不重複（時間戳做不到，兩次執行落在同一秒就會撞）；`&&` 串住 export 的結束狀態；`plutil -lint` 擋掉「寫到一半失敗但檔案非空」——實測磁碟寫入截斷的 plist 會讓 `test -s` 通過而 `plutil -lint` 回非零。還原前再 lint 一次，因為備份是在驗收之前做的，中間隔著人的操作。
+>
+> 路徑刻意放家目錄而不是 `mktemp -t` 的 `/var/folders`：那裡重開機會整棵清掉，而這份備份是使用者偏好的唯一副本。`mktemp` 的模板 `XXXXXX` 必須在字串結尾，接副檔名不會被替換（實測會生出字面叫 `XXXXXX` 的檔）；`defaults export`／`import` 不需要 `.plist` 副檔名。跨終端機做驗收時把印出來的那個路徑帶著。
 >
 > **結束 app 那兩行不可省。** 還原一個「還有行程在寫」的網域，本質上就是無效的：受測 app 在前景時持續輪詢額度並寫回自己的偏好（例如 `TrayAnimator.swift:221` 的 `tokenbar.quota.lastRemaining`），所以它可以在 `defaults import` 跑完之後再蓋一次。選單列 app 沒有視窗，最容易忘記它還在。
 >
