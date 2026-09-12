@@ -132,14 +132,22 @@ Live account-scope smoke必須在hermetic security suite通過後才執行，且
 >
 > ```bash
 > # 驗收前：先退出 /Applications/TokenBar.app，兩者同網域不可並行
-> defaults export com.nyanako.tokenbar ~/tokenbar-prefs-backup.plist
+> BACKUP=~/tokenbar-prefs-$(date +%Y%m%d-%H%M%S).plist
+> defaults export com.nyanako.tokenbar "$BACKUP"
+> test -s "$BACKUP" && echo "備份完成：$BACKUP"   # 沒印出來就不要往下做
+>
 > # ……驗收……
-> # 驗收後：先結束受測 app 並等它真的退出，再還原
+>
+> # 驗收後：先結束受測 app 並等它真的退出
 > osascript -e 'quit app "TokenBar"' 2>/dev/null || true
 > while pgrep -f 'dist/TokenBar.app' >/dev/null; do sleep 1; done
-> defaults delete com.nyanako.tokenbar
-> defaults import com.nyanako.tokenbar ~/tokenbar-prefs-backup.plist
+> # 備份不可用就停手：寧可留著髒偏好，也不要刪掉沒有備份的網域
+> test -s "$BACKUP" \
+>   && defaults delete com.nyanako.tokenbar \
+>   && defaults import com.nyanako.tokenbar "$BACKUP"
 > ```
+>
+> **備份檔名每次不同、而且 `delete` 綁在 `test -s` 後面，兩者都不是裝飾。** `defaults delete` 是破壞性的；若備份因為路徑不可寫或磁碟滿而失敗，而刪除仍照跑，結果是使用者的正式偏好被清掉且無從還原，或被上一次跑剩的舊備份蓋回去。所以檔名帶時間戳（不會沿用陳舊備份），而刪除只在備份確實存在且非空時才發生。跨終端機做驗收時把印出來的那個路徑帶著。
 >
 > **結束 app 那兩行不可省。** 還原一個「還有行程在寫」的網域，本質上就是無效的：受測 app 在前景時持續輪詢額度並寫回自己的偏好（例如 `TrayAnimator.swift:221` 的 `tokenbar.quota.lastRemaining`），所以它可以在 `defaults import` 跑完之後再蓋一次。選單列 app 沒有視窗，最容易忘記它還在。
 >
