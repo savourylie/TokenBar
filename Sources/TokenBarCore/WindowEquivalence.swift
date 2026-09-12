@@ -322,13 +322,53 @@ public enum WindowEquivalence {
     /// Denominated in money. Tokens are also returned, but cost is the steadier
     /// of the two here (5% against 7%), which is consistent with providers
     /// metering on something closer to cost than to a token count.
-    /// `declared` is whether the user has classified ANY source. It belongs
-    /// here rather than at the call site because the distinction it makes is
-    /// this type's own: with nothing declared every message resolves to
-    /// unassigned, so every cycle arrives carrying zero spend, and the rules
-    /// below would report that as "the quota moved and none of it was recorded
-    /// on this machine". That sentence describes a data failure. The actual
-    /// state is a missing declaration, and it is the state most users are in.
+    /// `declared` is whether the user has classified anything as belonging to
+    /// THIS subscription — `UsageAttribution.declares(subscription:records:)`
+    /// is the one place that answers it. It belongs as a parameter rather than
+    /// a decision made here because the distinction it makes is this type's
+    /// own: with this subscription undeclared every one of its messages
+    /// resolves to unassigned, so every cycle arrives carrying zero spend, and
+    /// the rules below would report that as "the quota moved and none of it
+    /// was recorded on this machine". That sentence describes a data failure.
+    /// The actual state is a missing declaration, and it is the state most
+    /// users are in.
+    ///
+    /// It used to be documented — and computed — as "has the user classified
+    /// ANY source", which is a question about the table. Declaring one client
+    /// then answered for every other, so an undeclared client's card described
+    /// usage sitting in the same scan as never recorded (issue #320).
+    /// The fold for a subscription, given the attribution table rather than a
+    /// conclusion drawn from it.
+    ///
+    /// This is the overload every shipping call site uses, and it exists
+    /// because the other one was too easy to answer wrongly. Three call sites
+    /// each derived `declared` themselves and each derived it as
+    /// `!records.isEmpty` — a question about the table, not about the
+    /// subscription — so declaring one client made every other client's card
+    /// claim its usage was never recorded (issue #320). Passing the question
+    /// instead of the answer removes the opportunity rather than documenting
+    /// it: there is no boolean here for a caller to compute from the wrong
+    /// subject.
+    ///
+    /// `subscription` must be the same one the spans were narrowed to. The
+    /// fold describes those spans, and describing them by a different
+    /// subscription's declaration state is exactly the defect above.
+    public static func aggregate(
+        subscription: String, records: [UsageAttribution.Record], cycles: [Cycle]
+    ) -> Row {
+        aggregate(
+            declared: UsageAttribution.declares(
+                subscription: subscription, records: records),
+            cycles: cycles)
+    }
+
+    /// Prefer `aggregate(subscription:records:cycles:)`. This overload takes
+    /// the answer; that one takes the question. Every shipping call site uses
+    /// the latter, and issue #320 is why: a caller holding a `Bool` is a
+    /// caller that had to derive it, and all three derived it from the wrong
+    /// subject. Kept public because the fold's own behaviour — that the flag,
+    /// not the empty spend, is what selects `.undeclared` — has to be
+    /// assertable without building an attribution table.
     public static func aggregate(declared: Bool = true, cycles: [Cycle]) -> Row {
         guard declared else { return .undeclared }
         // Admission is about EVIDENCE, not about money. Gating on `spanCost`

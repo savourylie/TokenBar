@@ -340,7 +340,8 @@ struct QuotaHistoryCard: View {
         if !counted.isEmpty {
             Text(WindowEquivalence.text(
                 WindowEquivalence.aggregate(
-                    declared: !UsageAttribution.parseRaw(attributionRaw).records.isEmpty,
+                    subscription: clientId,
+                    records: UsageAttribution.parseRaw(attributionRaw).records,
                     cycles: counted.map {
                         WindowEquivalence.Cycle(
                             deltaPercent: $0.cycle.usedPercent,

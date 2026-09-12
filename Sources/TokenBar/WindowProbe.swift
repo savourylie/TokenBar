@@ -188,7 +188,10 @@ enum WindowProbe {
                             // against numbers the app never computes.
                             modelScope: w.modelScope, confirmed: confirmed)
                         return WindowEquivalence.aggregate(
-                            declared: !confirmed.isEmpty,
+                            // Same subscription the spans above were narrowed
+                            // to; the probe measures the shipping calculation,
+                            // so it takes the shipping overload.
+                            subscription: agent.clientId, records: confirmed,
                             cycles: zip(admitted, spans).map { cycle, span in
                                 WindowEquivalence.Cycle(
                                     deltaPercent: cycle.usedPercent,

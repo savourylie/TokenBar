@@ -13402,6 +13402,56 @@ enum SelfTest {
             WindowEquivalence.aggregate(declared: true, cycles: [aeCycle(60, 0, 0)])
                 != .undeclared,
             "V15 and the flag is what decides it, not the empty spend those cycles carry")
+        // V18 (issue #320). The flag above is right when the table is empty and
+        // was wrong the moment one unrelated client was declared: every call
+        // site computed it as `!records.isEmpty`, a question about the table
+        // rather than about the subscription being rendered. On the reporting
+        // machine the table declared Claude, and Codex's card said "quota moved
+        // 216%, none of it recorded on this machine" over spans for which
+        // `get_window_usage` returned 1.2 billion tokens.
+        let v18Table = [
+            UsageAttribution.Record(
+                client: "claude", provider: "anthropic", state: .assigned("claude")),
+        ]
+        expect(
+            UsageAttribution.declares(subscription: "claude", records: v18Table),
+            "V18 a subscription with a record routing usage to it is declared")
+        expect(
+            !UsageAttribution.declares(subscription: "codex", records: v18Table),
+            "V18 declaring one client does not declare a different one — the "
+                + "question is about the subscription, not about the table")
+        // Through the overload the shipping call sites use, so this exercises
+        // the same path they do rather than a flag assembled by the test.
+        expect(
+            WindowEquivalence.aggregate(
+                subscription: "codex", records: v18Table, cycles: [aeCycle(60, 0, 0)])
+                == .undeclared,
+            "V18 so an undeclared client's cycles fold to .undeclared even while "
+                + "another client is declared, instead of claiming its usage was "
+                + "never recorded")
+        expect(
+            WindowEquivalence.aggregate(
+                subscription: "claude", records: v18Table, cycles: [aeCycle(60, 0, 0)])
+                != .undeclared,
+            "V18 and the declared client still folds normally through the same "
+                + "overload — the subscription is what separates them")
+        // The two states that must NOT count as declaring this subscription,
+        // because neither routes a single message to it: a record assigning
+        // usage elsewhere, and one excluding it.
+        expect(
+            !UsageAttribution.declares(
+                subscription: "codex",
+                records: [UsageAttribution.Record(
+                    client: "codex", provider: "openai", state: .excluded)]),
+            "V18 excluding a source is a classification, but it routes nothing "
+                + "here, so it cannot answer for this subscription")
+        expect(
+            UsageAttribution.declares(
+                subscription: "codex",
+                records: [UsageAttribution.Record(
+                    client: "claude", provider: "openai", state: .assigned("codex"))]),
+            "V18 and the client the record names is irrelevant — what counts is "
+                + "where it routes, matching the fold that admits by target")
         // V16. Pricing that is unavailable is not usage that is absent. Three
         // cycles with real tokens and no price used to fail the cost-only
         // admission gate and be reported as "none of it recorded on this
