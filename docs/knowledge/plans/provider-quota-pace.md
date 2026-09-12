@@ -120,7 +120,7 @@ Security review 與 2026-07-17 live prompt 後的修訂已把 Mac protocol 鎖�
 
 > **產品決策（2026-08-07，owner 拍板）：** pace 曲線模型的是「這個人如何在一個 window 內消耗額度」，那是操作者的性質，不是帳單歸屬的屬性。**分得出來就分，分不出來就不要硬分。**
 >
-> 接受的後果：在沒有 authoritative ID 的 provider 上，同一台機器的兩個帳號共用一條 pace series。影響 Claude 全部路線、Grok、Copilot、Antigravity remote，以及 `ChatGPT-Account-Id` 缺席時的 Codex。
+> 接受的後果：在沒有 authoritative ID 的 provider 上，同一台機器的兩個帳號共用一條 pace series。影響 Claude 全部路線、Grok、Copilot、Kiro、OpenCode Go、Antigravity remote，以及 `ChatGPT-Account-Id` 缺席時的 Codex。
 >
 > 一併接受的模型代價：series 存的是 `usedPercent` 對 phase，同一個人在不同規模的方案上斜率不同，合併會讓曲線失真。判斷是「失真的模型遠勝於永遠學不起來的模型」。**刻意不把 plan tier 放進 `windowKey`**，那會重新引入碎片化。
 >
@@ -140,6 +140,8 @@ Antigravity local IDE 的 email 來自 authenticated `GetUserStatus`，可走 au
 | Antigravity local IDE | Authenticated `GetUserStatus` email；缺席時 fail closed |
 | Antigravity remote OAuth | Google credential lineage；忽略 unbound active-email state |
 | Copilot | OpenCode GitHub credential lineage；本 Plan不新增 `/user` request |
+| Kiro | `getUsageLimits` response沒有 owner ID；kiro-cli SQLite entry與 Kiro IDE token file 兩個來源都走 credential lineage，history使用 provider-only 常數。IDE token file 的 `profileArn` 只用來 scope request，不作為 identity |
+| OpenCode Go | `/zen/go/v1/usage` response沒有 owner ID；`opencode-go` api key 走 credential lineage，history使用 provider-only 常數 |
 
 #### Installation key and HMAC
 
