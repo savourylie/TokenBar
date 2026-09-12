@@ -126,32 +126,32 @@ Live account-scope smoke必須在hermetic security suite通過後才執行，且
 
 ## Local build and UX acceptance
 
-> **⚠️ `make run` 與 bundle 讀的不是同一個 `UserDefaults` 網域。** `swift run TokenBar`（`make run` 就是它）產出裸執行檔：`.build/debug/` 底下沒有 `.app`，執行檔內查不到 `CFBundleIdentifier`，因此 `UserDefaults.standard` 落在以行程名為名的網域 **`TokenBar`**，而正式 bundle 用 **`com.nyanako.tokenbar`**。兩份偏好互不可見，且裸執行檔那一份會隨著開發過程被寫入，內容與使用者實際設定無關。
+> **⚠️ `make run` 與 bundle 讀的不是同一個 `UserDefaults` 網域。** `swift run TokenBar`（`make run` 就是它）產出裸執行檔、沒有 `CFBundleIdentifier`，`UserDefaults.standard` 因此落在行程名網域 **`TokenBar`**；bundle 用 **`com.nyanako.tokenbar`**（背景見本文件上方 bundle identity 段落）。兩份偏好互不可見，且裸執行檔那一份會隨開發過程被寫入，內容與使用者實際設定無關。
 >
-> 凡是驗收由偏好驅動的畫面——**usage attribution 宣告、Settings 持久化、狀態列項目狀態**——一律用 bundle，但**必須指定一次性的 bundle identifier**：
+> 凡是驗收由偏好驅動的畫面——**usage attribution 宣告、Settings 持久化、狀態列項目狀態**——一律用 `make bundle` 產生的 `dist/TokenBar.app`，並在**出貨 identifier 下**跑，前後備份還原使用者的偏好：
 >
 > ```bash
-> defaults write com.nyanako.tokenbar.uxcheck tokenbar.migratedFromBeta -bool true
-> BUNDLE_ID=com.nyanako.tokenbar.uxcheck make bundle
+> # 驗收前：先退出 /Applications/TokenBar.app，兩者同網域不可並行
+> defaults export com.nyanako.tokenbar ~/tokenbar-prefs-backup.plist
+> # ……驗收……
+> # 驗收後：先刪再匯入才是真還原
+> defaults delete com.nyanako.tokenbar
+> defaults import com.nyanako.tokenbar ~/tokenbar-prefs-backup.plist
 > ```
 >
-> **第一行不可省。** `AppDelegate.swift:69` 在任何東西讀 defaults 之前呼叫 `BetaMigration.runIfNeeded()`，而它只用**當前網域**裡的 `tokenbar.migratedFromBeta` 當守門（`BetaMigration.swift:17-27`），不看 bundle identifier。所以任何全新網域第一次啟動都會被灌入 `com.nyanako.tokenbar.beta` 的全部 `tokenbar.*` 值。先把 marker 設起來，那次匯入就不會發生。這不是假想情況——開發機上那個 beta 網域通常還在。
+> **`delete` 那一步不可省。** 實測（2026-09-13，於無關網域）：`defaults import` 是**合併**不是取代——驗收期間新增的鍵會存活下來，只有備份時就存在的鍵會被還原成舊值。先 `delete` 整個網域再 `import` 才會完全還原。
 >
-> **走 `make bundle`，不要直接叫 `scripts/bundle.sh`**：`Makefile:95-99` 會先跑 `relink_if_stale` 與 `rebuild_if_header_stale`，而該 script 只跑 `swift build -c release`。少了那兩道，改完 Rust 或 `ctb.h` 之後 SwiftPM 會沉默地沿用舊執行檔或舊 CTB module（理由寫在 `Makefile:101-121`），於是你驗到的是上一版的行為卻以為驗過了。`BUNDLE_ID` 由環境傳入，`make` 會原樣轉給 script。
+> **不要改用一次性的 `BUNDLE_ID` 來迴避備份**，即使那看起來更乾淨。本文件上方已經對同一個旋鈕做過完整推理並得出相反結論：拋棄式 identifier 是**比較弱的 gate**，抓不到以出貨字串本身為條件的值。當場就有實例——`SnapshotStore.swift:364` 要求 bundle id **字面等於** `com.nyanako.tokenbar`，換了 identifier 就整個關掉 restart snapshot，那個面因此無法驗收。
 >
-> **只覆寫 identifier，不要改 `OUT_DIR`**：產物仍然是 `dist/TokenBar.app`，下方的清理程序因此原封不動適用。另建一條路徑會多出一個沒有清理程序的產物。
->
-> `scripts/bundle.sh:15` 的預設 identifier 是出貨用的 `com.nyanako.tokenbar`，所以直接跑 `make bundle` 再操作 Settings，會把**使用者正式的偏好**改掉——`SettingsPanel.swift:839-848` 是直接 `UserDefaults.standard.set(...)`，刪掉 app 也不會還原。`make selftest-bundled` 早就是這樣取得自己的 identifier（`Makefile:79`、`:88` 的 `SELFTEST_BUNDLE_ID`），驗收沿用同一個機制即可。
->
-> 一次性 identifier 的網域一開始是空的，所以受測的宣告要先在該 app 裡設一次——那正是被測的路徑。但**網域不會隨 app 一起被刪**，所以清理程序多一行 `defaults delete`；不刪的話下一次驗收會繼承上一次的宣告，於是「空網域」這個前提在第二次就不成立。
->
+> **identifier 只隔離偏好，隔離不了資料。** `crates/tb_core_ffi/src/agent_quota_history.rs:454`、`:518` 與 `agent_account_scope.rs:220` 都是 `dirs::data_dir()` 接上**寫死的** `com.nyanako.tokenbar`，不由 bundle id 推導。所以本機 UX 驗收無論用哪個 identifier，都會讀寫使用者正式的 quota-pace history 與 account-scope storage。`~/Library/Caches/TokenBarDashboardSnapshot` 同樣是固定路徑。**要動到額度歷史的驗收，先另外備份那份 store，不要以為換 identifier 就隔離了。**
+
 > 這條規則來自一次實際的假回歸。Codex 時間窗歷史卡的每一列都顯示零 token 與零金額，並印出「額度變動了 N%，但這台機器上沒有記錄到」，而同一台機器上安裝的 bundle 顯示正常；當時 engine pin 剛推進過，於是看起來像那次推進造成的回歸。實際鏈條與 engine 無關：`tokenbar.usage.attribution.confirmed` 在兩個網域的內容不同，受測 client 在 bundle 網域有宣告、在行程名網域沒有，於是 `UsageAttribution.resolve` 回 `.unassigned`，`QuotaHistory.swift` 的 `spanTotals` 歸屬閘門把該 span 的每一則訊息都跳過，`spanTokens` 與 `spanCost` 皆為 0，`WindowEquivalence.aggregate` 因此回 `.unaccounted`。週期本身讀固定路徑的 `quota-pace-history-v3.json`，不受網域影響，所以列仍在——這正是它看起來像資料缺失而非組態差異的原因。
->
+
 > 同時排除掉的方向，記下來避免重查：推進前後兩個 engine pin 對同一批 span 回傳位元相同的訊息數與 token 總量，隔離快取也不改變結果——該鏈條不經過 `UsageAttribution`。
->
+
 > **不要**讓裸執行檔改讀 `UserDefaults(suiteName: "com.nyanako.tokenbar")` 來迴避這件事：那會讓開發執行檔寫進使用者正式的偏好網域，摧毀 `SELFTEST_BUNDLE_ID` 建立的隔離。
 
-不需要 `.app` bundle 語意、且不依賴 `UserDefaults` 的人工 UI 檢查，優先從 repository root 執行 `swift run TokenBar --open-popover`。需要 `make bundle` 產生的 `dist/TokenBar.app` 的有兩類：一是 icon、`Info.plist`、`LSUIElement`、Sparkle、autostart 或安裝路徑等 bundle-only 行為；二是**任何由偏好驅動的畫面**（usage attribution、Settings 持久化、狀態列項目狀態），且必須帶一次性的 `BUNDLE_ID`，理由與指令見上方的網域警告。以 Argument Domain 注入初始偏好的 deterministic 檢查不在此限，因為那種檢查自帶偏好、不讀既有網域。
+不需要 `.app` bundle 語意、且不依賴 `UserDefaults` 的人工 UI 檢查，優先從 repository root 執行 `swift run TokenBar --open-popover`。需要 `make bundle` 產生的 `dist/TokenBar.app` 的有兩類：一是 icon、`Info.plist`、`LSUIElement`、Sparkle、autostart 或安裝路徑等 bundle-only 行為；二是**任何由偏好驅動的畫面**（usage attribution、Settings 持久化、狀態列項目狀態），且必須照上方網域警告的備份還原程序走。以 Argument Domain 注入初始偏好的 deterministic 檢查不在此限，因為那種檢查自帶偏好、不讀既有網域。
 
 Provider quota pace 以 `swift run TokenBar --demo --open-popover` 提供 deterministic 人工驗收面；snapshot badge 明示 `FIXTURE`，且 `DemoUsageDataSource` 不呼叫 live FFI、不讀寫 quota cache。Historical／Linear／Off 都要實際呈現；驗收時必須區分低 remaining 觸發的 quota 長條黃／紅健康色，與 deficit stage 觸發的 pace marker／footer 橘色。橘色只看 actual 有沒有越過 expected 線，不看是哪個 estimator 畫出那條線——Historical 與 Linear 的 deficit 同色，狀態文案仍必須分辨兩者。舊規則（只有 `available` 可上色）已廢止：`available` 由每次 refresh 重跑的 out-of-sample fit gate 決定，同一張卡會在 Historical 與 `learningHistory` 之間來回，把顏色綁在 basis 上會讓使用者看到預測「一下子就不見了」，而底層 deficit 其實一直存在。
 
@@ -182,8 +182,8 @@ swift run TokenBar --demo --settings \
 
 | UX surface | Preferred path | Completion evidence |
 |---|---|---|
-| Popover、lens、keyboard、scroll、appearance | `swift run TokenBar --open-popover` | 實際操作與必要截圖；結束測試 process |
-| Individual client status items | `--demo --settings`配合兩個M2 Argument Domain keys驗initial visual state；本機資料、placement／right-click／跨螢幕則用同一`dist/TokenBar.app` | 預設只有主item；switch點擊後立即以`.mini`原生狀態更新，client shell可稍後於同一defaults reconciliation建立但不得阻塞control setter；Settings body重建不得同步呼叫`SMAppService.status`（本機量測單次約0.5～0.9秒），關閉／重開與連續toggle都須維持可互動；enable／disable／hide／restore保留selection與`tokenbar-client-<id>` placement；`antigravity-cli`在本機error-only provider狀態仍可配置；dashboard選定單一年份時，Settings仍以all-time graph保留所有live client item rows並可停用；client A→B沿用同一popover並各自恢復本次app session停留的lens；主item恢復自己的client-plus-lens route，不被individual item覆寫；主item right-click仍只改global source；1x／2x雙向移動圖示清晰；VoiceOver label不含raw card／error，explicit error fallback固定讀作last-known而非current quota；0與8 items的idle profile沒有per-client loop |
+| Popover、lens、keyboard、scroll、appearance | `swift run TokenBar --open-popover`；但 lens 記憶與 appearance 的互動寫入是偏好驅動的，那部分依上方網域警告改用 bundle 加備份還原 | 實際操作與必要截圖；結束測試 process |
+| Individual client status items | `--demo --settings`配合兩個M2 Argument Domain keys驗initial visual state；本機資料、placement／right-click／跨螢幕則用同一`dist/TokenBar.app`（placement 記憶存在 app 自己的偏好網域，依上方網域警告備份還原，不要換 identifier——換了等於記憶歸零） | 預設只有主item；switch點擊後立即以`.mini`原生狀態更新，client shell可稍後於同一defaults reconciliation建立但不得阻塞control setter；Settings body重建不得同步呼叫`SMAppService.status`（本機量測單次約0.5～0.9秒），關閉／重開與連續toggle都須維持可互動；enable／disable／hide／restore保留selection與`tokenbar-client-<id>` placement；`antigravity-cli`在本機error-only provider狀態仍可配置；dashboard選定單一年份時，Settings仍以all-time graph保留所有live client item rows並可停用；client A→B沿用同一popover並各自恢復本次app session停留的lens；主item恢復自己的client-plus-lens route，不被individual item覆寫；主item right-click仍只改global source；1x／2x雙向移動圖示清晰；VoiceOver label不含raw card／error，explicit error fallback固定讀作last-known而非current quota；0與8 items的idle profile沒有per-client loop |
 | Icon、bundle identity、Sparkle、autostart | `make bundle` 後啟動 `dist/TokenBar.app` | 記錄 bundle-only 行為；完成後 unregister 並移除本機 bundle |
 | Homebrew、Sparkle stable update、正式安裝路徑 | `/Applications/TokenBar.app` | 不以 `dist/TokenBar.app` 代替 installed-app 驗收 |
 
@@ -198,8 +198,6 @@ test -e "$ROOT/dist/.metadata_never_index"
 "$LSREGISTER" -u "$LOCAL_APP" 2>/dev/null || true
 rm -rf -- "$LOCAL_APP"
 
-# 偏好驅動的驗收若用了一次性 identifier，網域不會隨 app 消失，要另外刪。
-defaults delete com.nyanako.tokenbar.uxcheck 2>/dev/null || true
 ```
 
 清理後，Spotlight 與 LaunchServices 查詢都不應再列出 repository 的 `dist/TokenBar.app`；正常情況只保留 `/Applications/TokenBar.app`：
