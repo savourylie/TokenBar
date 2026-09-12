@@ -134,16 +134,20 @@ Live account-scope smoke必須在hermetic security suite通過後才執行，且
 > # 驗收前：先退出 /Applications/TokenBar.app，兩者同網域不可並行
 > defaults export com.nyanako.tokenbar ~/tokenbar-prefs-backup.plist
 > # ……驗收……
-> # 驗收後：先刪再匯入才是真還原
+> # 驗收後：先結束受測 app 並等它真的退出，再還原
+> osascript -e 'quit app "TokenBar"' 2>/dev/null || true
+> while pgrep -f 'dist/TokenBar.app' >/dev/null; do sleep 1; done
 > defaults delete com.nyanako.tokenbar
 > defaults import com.nyanako.tokenbar ~/tokenbar-prefs-backup.plist
 > ```
 >
-> **`delete` 那一步不可省。** 實測（2026-09-13，於無關網域）：`defaults import` 是**合併**不是取代——驗收期間新增的鍵會存活下來，只有備份時就存在的鍵會被還原成舊值。先 `delete` 整個網域再 `import` 才會完全還原。
+> **結束 app 那兩行不可省。** 還原一個「還有行程在寫」的網域，本質上就是無效的：受測 app 在前景時持續輪詢額度並寫回自己的偏好（例如 `TrayAnimator.swift:221` 的 `tokenbar.quota.lastRemaining`），所以它可以在 `defaults import` 跑完之後再蓋一次。選單列 app 沒有視窗，最容易忘記它還在。
+>
+> **`delete` 那一步也不可省。** 實測（2026-09-13，於無關網域）：`defaults import` 是**合併**不是取代——驗收期間新增的鍵會存活下來，只有備份時就存在的鍵會被還原成舊值。先 `delete` 整個網域再 `import` 才會完全還原。
 >
 > **不要改用一次性的 `BUNDLE_ID` 來迴避備份**，即使那看起來更乾淨。本文件上方已經對同一個旋鈕做過完整推理並得出相反結論：拋棄式 identifier 是**比較弱的 gate**，抓不到以出貨字串本身為條件的值。當場就有實例——`SnapshotStore.swift:364` 要求 bundle id **字面等於** `com.nyanako.tokenbar`，換了 identifier 就整個關掉 restart snapshot，那個面因此無法驗收。
 >
-> **identifier 只隔離偏好，隔離不了資料。** `crates/tb_core_ffi/src/agent_quota_history.rs:454`、`:518` 與 `agent_account_scope.rs:220` 都是 `dirs::data_dir()` 接上**寫死的** `com.nyanako.tokenbar`，不由 bundle id 推導。所以本機 UX 驗收無論用哪個 identifier，都會讀寫使用者正式的 quota-pace history 與 account-scope storage。`~/Library/Caches/TokenBarDashboardSnapshot` 同樣是固定路徑。**要動到額度歷史的驗收，先另外備份那份 store，不要以為換 identifier 就隔離了。**
+> **identifier 只隔離偏好，隔離不了資料。** `crates/tb_core_ffi/src/agent_quota_history.rs:454`、`:518` 與 `agent_account_scope.rs:220` 都是 `dirs::data_dir()` 接上**寫死的** `com.nyanako.tokenbar`，不由 bundle id 推導。所以本機 UX 驗收無論用哪個 identifier，都會讀寫使用者正式的 quota-pace history 與 account-scope storage。`~/Library/Caches/TokenBarDashboardSnapshot` 同樣是固定路徑。**而且這不限於刻意驗額度的場合。** 非 demo 的 bundle 一啟動，`TrayAnimator.start()`（`TrayAnimator.swift:180`）就無條件進入額度輪詢，走生產路徑的 `enrich_snapshot`（`agent_usage.rs:1504`）把觀測寫進那份固定路徑的 store。所以**任何**非 demo 的本機 bundle 驗收都在寫使用者的正式歷史庫，連只看 Settings 或狀態列的也是。要嘛連那份 store 一起備份還原，要嘛改用 `--demo`。
 
 > 這條規則來自一次實際的假回歸。Codex 時間窗歷史卡的每一列都顯示零 token 與零金額，並印出「額度變動了 N%，但這台機器上沒有記錄到」，而同一台機器上安裝的 bundle 顯示正常；當時 engine pin 剛推進過，於是看起來像那次推進造成的回歸。實際鏈條與 engine 無關：`tokenbar.usage.attribution.confirmed` 在兩個網域的內容不同，受測 client 在 bundle 網域有宣告、在行程名網域沒有，於是 `UsageAttribution.resolve` 回 `.unassigned`，`QuotaHistory.swift` 的 `spanTotals` 歸屬閘門把該 span 的每一則訊息都跳過，`spanTokens` 與 `spanCost` 皆為 0，`WindowEquivalence.aggregate` 因此回 `.unaccounted`。週期本身讀固定路徑的 `quota-pace-history-v3.json`，不受網域影響，所以列仍在——這正是它看起來像資料缺失而非組態差異的原因。
 
