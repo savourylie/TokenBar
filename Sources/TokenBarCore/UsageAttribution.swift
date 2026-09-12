@@ -91,6 +91,31 @@ public enum UsageAttribution {
             records: records)
     }
 
+    /// Whether any confirmed record routes usage to `subscription`.
+    ///
+    /// This is the question a window-history card has to ask before it can
+    /// describe an empty span. It must be the SAME question that decides what
+    /// gets counted into that span — `QuotaHistory`'s fold admits a message
+    /// only when `resolve` returns `.assigned(subscription)` — because the two
+    /// together are what separates "the machine recorded nothing" from "the
+    /// machine recorded it and you have not said whose it is". Asking anything
+    /// broader here makes the card claim the first while the second is true.
+    ///
+    /// It lives here, once, because it had been spelled out at three call
+    /// sites and all three spelled it wrong the same way: `!records.isEmpty`,
+    /// which is a question about the TABLE rather than about this
+    /// subscription, so declaring any one client answered for every other.
+    /// A fourth call site gets the answer rather than another chance to
+    /// rewrite it.
+    ///
+    /// `.excluded` deliberately does not count. It is a classification, so the
+    /// user has acted — but nothing it marks will ever be counted toward this
+    /// subscription, and a card that said "classified" while showing an empty
+    /// span would be back to describing an absence it cannot account for.
+    public static func declares(subscription: String, records: [Record]) -> Bool {
+        records.contains { $0.state == .assigned(subscription) }
+    }
+
     /// Parse a raw @AppStorage string. A missing value is an empty writable
     /// table; malformed or semantically invalid data is an empty read-only
     /// table so a later mutation cannot overwrite data this codec does not

@@ -1454,7 +1454,10 @@ private struct DashboardSnapshot {
                     payload: agentUsage, cardId: key),
                 confirmed: confirmed)
             built[key] = WindowEquivalence.aggregate(
-                declared: !confirmed.isEmpty,
+                // The same `client` the spans above were narrowed to. The fold
+                // asks the table itself; this call site does not get to decide
+                // what "declared" means.
+                subscription: client, records: confirmed,
                 cycles: zip(cycles, spans).map { cycle, span in
                     WindowEquivalence.Cycle(
                         deltaPercent: cycle.usedPercent, spanTokens: span.tokens,

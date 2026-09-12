@@ -1667,6 +1667,14 @@ enum SelfTest {
             claudeProviderRow?.client == "claude" && attributionTargets.contains("codex"),
             "claude source rows can target a different subscription client")
 
+        // opencode carries its own OpenCode Go quota snapshot in the demo payload
+        // (identity "Go" + windows), but it is a router: it must never become a
+        // direct attribution target (architecture.md, "Router 不進表"). Without the
+        // router guard in subscriptionClients, the snapshot would admit it here.
+        expect(
+            !attributionTargets.contains("opencode"),
+            "opencode's own quota snapshot does not make it an attribution target")
+
         expect(
             UsageAttributionSettings.suggestionTarget(
                 sourceClient: "copilot", provider: "openai",
@@ -1691,8 +1699,10 @@ enum SelfTest {
                 sourceClient: "claude", provider: "openai",
                 subscriptionClients: ["claude", "codex"]) == .assigned("codex"),
             "gateway-routed openai usage suggests the codex subscription")
-        // opencode is a router with no plan of its own, so with nothing declared
-        // about what it is signed into, nothing can be said. This used to answer
+        // opencode is a router with no cost plan of its own for attribution (its
+        // OpenCode Go quota is a subscription-quota card, not a model-cost plan),
+        // so with nothing declared about what it is signed into, nothing can be
+        // said about which subscription its local usage spends. This used to answer
         // `.excluded` — an assertion that the tokens were bought — which the
         // 2026-08 survey showed there was never evidence for.
         expect(
@@ -1801,6 +1811,25 @@ enum SelfTest {
         expect(
             UsageAttributionSettings.subscriptionClients(from: opencodeDuplicatePayload) == ["codex"],
             "a subscription reported by both sources appears once")
+
+        // Kiro is a real multi-vendor subscription (architecture.md attribution
+        // table), not a router: its own quota snapshot makes it an assignment
+        // target, exactly like Copilot and unlike opencode, which is excluded.
+        // The Kiro provider now publishes such a snapshot, so this guards that
+        // it is admitted here rather than filtered out.
+        let kiroPayload = try! JSONDecoder().decode(
+            AgentUsagePayload.self,
+            from: Data(#"{"generatedAt":"now","agents":[{"clientId":"kiro","source":"oauth","updatedAt":"now","identity":{"plan":"Kiro Pro"},"windows":[{"cardId":"usage.v1","label":"Monthly","usedPercent":41,"remainingPercent":59,"paceStatus":{"state":"learningDuration","windowKey":"usage.v1","completeCycles":0}}]}]}"#.utf8))
+        expect(
+            UsageAttributionSettings.subscriptionClients(from: kiroPayload) == ["kiro"],
+            "a kiro quota snapshot makes kiro an assignment target")
+        // Kiro sells a deepseek plan, so a kiro row logged against deepseek is
+        // its own spend — the owning-source rule resolves it to kiro.
+        expect(
+            UsageAttributionSettings.suggestionTarget(
+                sourceClient: "kiro", provider: "deepseek",
+                subscriptionClients: ["kiro"]) == .assigned("kiro"),
+            "kiro's own deepseek usage suggests the kiro subscription")
 
         // The structural guard, not another hand-kept row. Rust's
         // `subscription_label` renames four providers and capitalizes the rest,
@@ -4599,6 +4628,28 @@ enum SelfTest {
                 && unknownTransport?.first?.status == nil
                 && unknownTransport?.first?.osCode == nil,
             "unknown transport tuples drop associated numerics")
+        // The Kiro provider publishes diagnostics under clientId "kiro"; it is on
+        // the allowlist, so its id is preserved rather than rewritten to "unknown"
+        // like an unsupported client.
+        let kiroTransport = transportEntries(
+            transportBase.replacingOccurrences(of: "codex", with: "kiro")
+                + #","transportDiagnostic":{"category":"rateLimited","status":429,"osCode":-1}"#)
+        expect(
+            kiroTransport?.first?.clientId == "kiro"
+                && kiroTransport?.first?.category == "rateLimited"
+                && kiroTransport?.first?.status == 429,
+            "kiro transport diagnostics keep their client id")
+        // The OpenCode Go provider publishes diagnostics under clientId "opencode";
+        // it is on the allowlist, so its id is preserved rather than rewritten to
+        // "unknown" like an unsupported client.
+        let opencodeTransport = transportEntries(
+            transportBase.replacingOccurrences(of: "codex", with: "opencode")
+                + #","transportDiagnostic":{"category":"rateLimited","status":429,"osCode":-1}"#)
+        expect(
+            opencodeTransport?.first?.clientId == "opencode"
+                && opencodeTransport?.first?.category == "rateLimited"
+                && opencodeTransport?.first?.status == 429,
+            "opencode transport diagnostics keep their client id")
         let malformedTransportBodies = [
             transportBase + #","transportDiagnostic":"not-an-object""#,
             transportBase + #","transportDiagnostic":{"status":500}"#,
@@ -5356,6 +5407,27 @@ enum SelfTest {
                 placeholders: ["codex", "claude", "gemini"])
                 == ["claude", "antigravity"],
             "knownLimitsClients drops no-limit present ids, keeps quota-only ids")
+
+        // opencodeCardClients: the OpenCode Go quota (ported from mana.bar) makes
+        // opencode its own quota provider, not only a router. Its own window card
+        // leads when the snapshot is present, then the routed subscriptions; it is
+        // never duplicated into the tail. The false case must NOT prepend, or the
+        // "no Go plan signed in" account would show an empty opencode card.
+        expect(
+            AgentLimitsCard.opencodeCardClients(
+                ownQuotaPresent: true, subscriptions: ["codex", "claude"])
+                == ["opencode", "codex", "claude"],
+            "opencodeCardClients leads with opencode's own quota, then subscriptions")
+        expect(
+            AgentLimitsCard.opencodeCardClients(
+                ownQuotaPresent: false, subscriptions: ["codex", "claude"])
+                == ["codex", "claude"],
+            "opencodeCardClients omits opencode when it has no Go quota snapshot")
+        expect(
+            AgentLimitsCard.opencodeCardClients(
+                ownQuotaPresent: true, subscriptions: ["opencode", "codex"])
+                == ["opencode", "codex"],
+            "opencodeCardClients never duplicates opencode into the subscription tail")
 
         // CSV id-set parse helper: empty string → empty set; commas split.
         expect(ClientRegistry.parseIdSet("").isEmpty, "parseIdSet empty string is empty")
@@ -7357,7 +7429,17 @@ enum SelfTest {
         // where comparing the two fields to each other proves nothing. Most
         // providers report the session/weekly pair; one whose real shape differs
         // states its own row rather than forcing every client to match it.
-        let demoCardIdsByClient: [String: [String]] = ["grok-bot": ["weekly.v1"]]
+        let demoCardIdsByClient: [String: [String]] = [
+            // Grok Bot reports one weekly allowance; the card ID is
+            // `agent_grokbot.rs`'s `WEEKLY_WINDOW_KEY`.
+            "grok-bot": ["weekly.v1"],
+            // Kiro reports one monthly allowance rather than the session/weekly
+            // pair; the card ID is `agent_kiro.rs`'s `WINDOW_KEY`.
+            "kiro": ["usage.v1"],
+            // OpenCode Go reports three rolling windows rather than the
+            // session/weekly pair; the card IDs are `agent_opencode_go.rs`'s.
+            "opencode": ["rolling.v1", "weekly.v1", "monthly.v1"],
+        ]
         let defaultDemoCardIds = ["session.v1", "weekly.v1"]
         expect(
             quota.agents.count == ClientRegistry.allIds.count
@@ -13386,6 +13468,56 @@ enum SelfTest {
             WindowEquivalence.aggregate(declared: true, cycles: [aeCycle(60, 0, 0)])
                 != .undeclared,
             "V15 and the flag is what decides it, not the empty spend those cycles carry")
+        // V18 (issue #320). The flag above is right when the table is empty and
+        // was wrong the moment one unrelated client was declared: every call
+        // site computed it as `!records.isEmpty`, a question about the table
+        // rather than about the subscription being rendered. On the reporting
+        // machine the table declared Claude, and Codex's card said "quota moved
+        // 216%, none of it recorded on this machine" over spans for which
+        // `get_window_usage` returned 1.2 billion tokens.
+        let v18Table = [
+            UsageAttribution.Record(
+                client: "claude", provider: "anthropic", state: .assigned("claude")),
+        ]
+        expect(
+            UsageAttribution.declares(subscription: "claude", records: v18Table),
+            "V18 a subscription with a record routing usage to it is declared")
+        expect(
+            !UsageAttribution.declares(subscription: "codex", records: v18Table),
+            "V18 declaring one client does not declare a different one — the "
+                + "question is about the subscription, not about the table")
+        // Through the overload the shipping call sites use, so this exercises
+        // the same path they do rather than a flag assembled by the test.
+        expect(
+            WindowEquivalence.aggregate(
+                subscription: "codex", records: v18Table, cycles: [aeCycle(60, 0, 0)])
+                == .undeclared,
+            "V18 so an undeclared client's cycles fold to .undeclared even while "
+                + "another client is declared, instead of claiming its usage was "
+                + "never recorded")
+        expect(
+            WindowEquivalence.aggregate(
+                subscription: "claude", records: v18Table, cycles: [aeCycle(60, 0, 0)])
+                != .undeclared,
+            "V18 and the declared client still folds normally through the same "
+                + "overload — the subscription is what separates them")
+        // The two states that must NOT count as declaring this subscription,
+        // because neither routes a single message to it: a record assigning
+        // usage elsewhere, and one excluding it.
+        expect(
+            !UsageAttribution.declares(
+                subscription: "codex",
+                records: [UsageAttribution.Record(
+                    client: "codex", provider: "openai", state: .excluded)]),
+            "V18 excluding a source is a classification, but it routes nothing "
+                + "here, so it cannot answer for this subscription")
+        expect(
+            UsageAttribution.declares(
+                subscription: "codex",
+                records: [UsageAttribution.Record(
+                    client: "claude", provider: "openai", state: .assigned("codex"))]),
+            "V18 and the client the record names is irrelevant — what counts is "
+                + "where it routes, matching the fold that admits by target")
         // V16. Pricing that is unavailable is not usage that is absent. Three
         // cycles with real tokens and no price used to fail the cost-only
         // admission gate and be reported as "none of it recorded on this

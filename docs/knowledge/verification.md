@@ -5,7 +5,7 @@ kind: canonical
 scope: repository
 read_when: changing runtime code, running a local build or UX acceptance, parser output, cache behavior, FFI contracts, or this knowledge tree
 last_verified: 2026-09-11
-sources: [".github/workflows/ci.yml", "Makefile", "Package.swift", "scripts/bundle.sh", "Sources/TokenBar/ClientTray.swift", "Sources/TokenBar/StatusItemController.swift", "Sources/TokenBar/MenuBarTextColor.swift", "Sources/TokenBar/Views/AgentIconView.swift", "Sources/TokenBar/Views/SettingsPanel.swift", "Sources/TokenBar/SelfTest.swift", "Sources/TokenBar/ClaudeExtraRoots.swift", "crates/tb_core_ffi/src/agent_account_scope.rs", "crates/tb_core_ffi/src/agent_quota_history.rs", "crates/tb_core_ffi/src/agent_storage_windows.rs", "crates/tb_core_ffi/src/extra_scan_paths.rs", "docs/knowledge/plans/provider-quota-pace.md", "docs/knowledge/plans/codex-historical-pace-v2.md", "public TokenBar-Windows PR #7", "public TokenBar PR #114", "public TokenBar-Windows PR #12", "AGENTS.md", "memory-derived hermetic verification practice", "memory-derived local build indexing incident"]
+sources: [".github/workflows/ci.yml", "Makefile", "Package.swift", "scripts/bundle.sh", "Sources/TokenBar/ClientTray.swift", "Sources/TokenBar/StatusItemController.swift", "Sources/TokenBar/MenuBarTextColor.swift", "Sources/TokenBar/Views/AgentIconView.swift", "Sources/TokenBar/Views/SettingsPanel.swift", "Sources/TokenBar/SelfTest.swift", "Sources/TokenBar/ClaudeExtraRoots.swift", "crates/tb_core_ffi/src/agent_account_scope.rs", "crates/tb_core_ffi/src/agent_quota_history.rs", "crates/tb_core_ffi/src/agent_storage_windows.rs", "crates/tb_core_ffi/src/agent_kiro.rs", "crates/tb_core_ffi/src/kiro_integrations.rs", "crates/tb_core_ffi/src/extra_scan_paths.rs", "docs/knowledge/plans/provider-quota-pace.md", "docs/knowledge/plans/codex-historical-pace-v2.md", "public TokenBar-Windows PR #7", "public TokenBar PR #114", "public TokenBar-Windows PR #12", "AGENTS.md", "memory-derived hermetic verification practice", "memory-derived local build indexing incident"]
 ---
 
 # Verification contract
@@ -43,7 +43,7 @@ sources: [".github/workflows/ci.yml", "Makefile", "Package.swift", "scripts/bund
 
 > **Hermetic 原則：** Live app 在沒有觸發條件時顯示「沒有變化」，只證明常見資料不崩，不能證明修正有效。權威證據是可重跑、與本機資料無關的 fixture。
 
-PT0 的 hermetic authorities are Rust last-good and binding decisions, refresh status-before-body ordering, Grok monthly additive behavior, Copilot loader precedence, and Antigravity precedence; the FFI A/B publication-generation ordering and Swift diagnostic-candidate plus isolated UserDefaults scalar and local publication-state tests are required at the cross-language seam. The Rust fixture must pause A after its gate helper returns, let B obtain generation 2 and record its return first, then release A; it checks both return order and payload generations/content. A separate exhaustion fixture starts at `u64::MAX - 1` and proves the next call fails closed without invoking the publication body or repeating a generation. Swift fixtures distinguish bridge failure from malformed/missing successful data, prove Settings identities change across generations, legacy resolved values, selections, and exclusions, drive the tray apply seam with generation 2 terminal followed by generation 1 success to prove the late result resolves to generation 2 and cannot revive its scalar, and prove a generation 3 Dashboard publication replaces both an older tray payload and scalar before the tray's own poll returns while changing the gauge signature that gates immediate rendering. Live smoke requires authorization for that run and cannot replace these fixtures.
+PT0 的 hermetic authorities are Rust last-good and binding decisions, refresh status-before-body ordering, Grok monthly additive behavior, Copilot loader precedence, Antigravity precedence, and the Kiro multi-source token loader (kiro-cli SQLite and Kiro IDE token file) with its last-good caching; the FFI A/B publication-generation ordering and Swift diagnostic-candidate plus isolated UserDefaults scalar and local publication-state tests are required at the cross-language seam. The Rust fixture must pause A after its gate helper returns, let B obtain generation 2 and record its return first, then release A; it checks both return order and payload generations/content. A separate exhaustion fixture starts at `u64::MAX - 1` and proves the next call fails closed without invoking the publication body or repeating a generation. Swift fixtures distinguish bridge failure from malformed/missing successful data, prove Settings identities change across generations, legacy resolved values, selections, and exclusions, drive the tray apply seam with generation 2 terminal followed by generation 1 success to prove the late result resolves to generation 2 and cannot revive its scalar, and prove a generation 3 Dashboard publication replaces both an older tray payload and scalar before the tray's own poll returns while changing the gauge signature that gates immediate rendering. Live smoke requires authorization for that run and cannot replace these fixtures.
 
 | Fixture property | Required assertion |
 |---|---|
@@ -59,7 +59,7 @@ PT0 的 hermetic authorities are Rust last-good and binding decisions, refresh s
 | Usage attribution | 政策以結構性斷言驗證而非逐條列舉：每個 bound provider 必須指名 `providerOwnClient` 保護對象、每個 first-party 廠商必須能從其 opencode 標籤解析回自己的 client、表內每個 client 必須在註冊表中。另驗證：來源 client 可為註冊表外的動態 id 而目標不可、自家訂閱優先且不需要 quota snapshot、未調查的來源回傳 nil 而非斷言 API 支出、已宣告的 router 計入它簽入的訂閱 |
 | Quota curve snapshot | Binding admission 以真實 snapshots 驗證（trusted scope 不足以綁定：帶 `error` 的 last-good 與帶 `transport_diagnostic` 的 degraded 都必須排除），window key 由 production mapper 產生而非寫進 fixture，因此 mapper 端改身分會失敗而不是靜默 unbind；lifecycle 驗證 serialization 失敗保留前一個 tuple、generation 過期為錯誤、process restart 後不供應；binding lock 必須在 history I/O 前釋放，且 read 之後重新解析 binding——tuple 在 I/O 期間被替換（含同 generation 換帳號）必須 fail closed，settled binding 則仍正常供應 |
 | Cache schema | 舊版本 cache 不被當成新 layout 靜默接受；新 layout 可重建並 reload |
-| Provider transport fallback | last-good binding、refresh status-before-body、terminal/absent/4xx/schema/required-meter clearing、Grok additive monthly、Copilot loader、以及 diagnostic allowlist 都以 hermetic responses 驗證 |
+| Provider transport fallback | last-good binding、refresh status-before-body、terminal/absent/4xx/schema/required-meter clearing、Grok additive monthly、Copilot loader、OpenCode Go loader／`usable_success("opencode")` last-good／sibling-isolated window decode、以及 diagnostic allowlist 都以 hermetic responses 驗證 |
 | Grok Bot adapter | Synthetic desktop／SQLite stores 驗證 active-account precedence、解碼失敗不得跨帳號回退、signed-out 不復活 legacy login、team header 與 endpoint 配對；quota mapper 驗證 stable weekly key、provider duration、無效 meter 與 pooled allowance。使用 temporary scope backend 驗證 credential rotation／帳號／team 的 cache 與 history 分離，並由 production outcome adapter 驗證同 request transient 才可沿用 last-good，terminal／absent／schema error 清除。Swift selftest 驗證分組成員、獨立額度開關、實際卡片 visibility filter 與 Auto selection 一致；不得在 unit tests 使用真實 Keychain 或 provider credential |
 | FFI publication | Provider run、JSON serialize、envelope、raw C-pointer publication 的 single-flight、gate-assigned checked `publicationGeneration`、exhaustion fail-closed、可反轉的 C return order，以及單次 run 內 provider 並行分別驗證 |
 | Source-aware filter parity | `tb_filter_parity_probe` uses one context, fresh graph, `token0…token5`, exact integer comparison, diagnostic-only cost deltas because pricing refreshes independently from source generations, and short-circuits invalid later scans. Its synchronous callback seam tests stable match/mismatch, price-only refresh, tokenUnavailable versus graph failure, every source-change boundary, Agents-only late changes, call ordering, and a size-changing append token. The dedicated vendor fixture covers canonical, cc-mirror exact gating, synthetic gateway, duplicate canonical paths, inherited scanner-root isolation, unattributed `Main`, and cold/warm cache parity. |
@@ -127,7 +127,47 @@ Live account-scope smoke必須在hermetic security suite通過後才執行，且
 
 ## Local build and UX acceptance
 
-不需要 `.app` bundle 語意的人工 UI 檢查，優先從 repository root 執行 `swift run TokenBar --open-popover`。只有 icon、`Info.plist`、`LSUIElement`、Sparkle、autostart 或安裝路徑等 bundle-only 行為，才以 `make bundle` 產生的 `dist/TokenBar.app` 驗收。
+> **⚠️ `make run` 與 bundle 讀的不是同一個 `UserDefaults` 網域。** `swift run TokenBar`（`make run` 就是它）產出裸執行檔、沒有 `CFBundleIdentifier`，`UserDefaults.standard` 因此落在行程名網域 **`TokenBar`**；bundle 用 **`com.nyanako.tokenbar`**（背景見本文件上方 bundle identity 段落）。兩份偏好互不可見，且裸執行檔那一份會隨開發過程被寫入，內容與使用者實際設定無關。
+>
+> 凡是驗收由偏好驅動的畫面——**usage attribution 宣告、Settings 持久化、狀態列項目狀態**——一律用 `make bundle` 產生的 `dist/TokenBar.app`，並在**出貨 identifier 下**跑，前後備份還原使用者的偏好：
+>
+> ```bash
+> # 驗收前：先退出 /Applications/TokenBar.app，兩者同網域不可並行
+> BACKUP=$(mktemp ~/tokenbar-prefs-XXXXXX)
+> defaults export com.nyanako.tokenbar "$BACKUP" \
+>   && plutil -lint "$BACKUP" \
+>   && echo "備份完成：$BACKUP"   # 沒印出來就不要往下做
+>
+> # ……驗收……
+>
+> # 驗收後：先結束受測 app 並等它真的退出
+> osascript -e 'quit app "TokenBar"' 2>/dev/null || true
+> while pgrep -f 'dist/TokenBar.app' >/dev/null; do sleep 1; done
+> # 備份不可用就停手：寧可留著髒偏好，也不要刪掉沒有備份的網域
+> plutil -lint "$BACKUP" \
+>   && defaults delete com.nyanako.tokenbar \
+>   && defaults import com.nyanako.tokenbar "$BACKUP"
+> ```
+>
+> **`mktemp` 與兩次 `plutil -lint` 都不是裝飾。** `defaults delete` 是破壞性的；若備份失敗而刪除仍照跑，結果是使用者的正式偏好被清掉且無從還原，或被上一次跑剩的舊檔蓋回去。三個環節各擋一種失敗，沒有一個能取代另一個：`mktemp` 保證檔名不重複（時間戳做不到，兩次執行落在同一秒就會撞）；`&&` 串住 export 的結束狀態；`plutil -lint` 擋掉「寫到一半失敗但檔案非空」——實測磁碟寫入截斷的 plist 會讓 `test -s` 通過而 `plutil -lint` 回非零。還原前再 lint 一次，因為備份是在驗收之前做的，中間隔著人的操作。
+>
+> 路徑刻意放家目錄而不是 `mktemp -t` 的 `/var/folders`：那裡重開機會整棵清掉，而這份備份是使用者偏好的唯一副本。`mktemp` 的模板 `XXXXXX` 必須在字串結尾，接副檔名不會被替換（實測會生出字面叫 `XXXXXX` 的檔）；`defaults export`／`import` 不需要 `.plist` 副檔名。跨終端機做驗收時把印出來的那個路徑帶著。
+>
+> **結束 app 那兩行不可省。** 還原一個「還有行程在寫」的網域，本質上就是無效的：受測 app 在前景時持續輪詢額度並寫回自己的偏好（例如 `TrayAnimator.swift:221` 的 `tokenbar.quota.lastRemaining`），所以它可以在 `defaults import` 跑完之後再蓋一次。選單列 app 沒有視窗，最容易忘記它還在。
+>
+> **`delete` 那一步也不可省。** 實測（2026-09-13，於無關網域）：`defaults import` 是**合併**不是取代——驗收期間新增的鍵會存活下來，只有備份時就存在的鍵會被還原成舊值。先 `delete` 整個網域再 `import` 才會完全還原。
+>
+> **不要改用一次性的 `BUNDLE_ID` 來迴避備份**，即使那看起來更乾淨。本文件上方已經對同一個旋鈕做過完整推理並得出相反結論：拋棄式 identifier 是**比較弱的 gate**，抓不到以出貨字串本身為條件的值。當場就有實例——`SnapshotStore.swift:364` 要求 bundle id **字面等於** `com.nyanako.tokenbar`，換了 identifier 就整個關掉 restart snapshot，那個面因此無法驗收。
+>
+> **identifier 只隔離偏好，隔離不了資料。** `crates/tb_core_ffi/src/agent_quota_history.rs:454`、`:518` 與 `agent_account_scope.rs:220` 都是 `dirs::data_dir()` 接上**寫死的** `com.nyanako.tokenbar`，不由 bundle id 推導。所以本機 UX 驗收無論用哪個 identifier，都會讀寫使用者正式的 quota-pace history 與 account-scope storage。`~/Library/Caches/TokenBarDashboardSnapshot` 同樣是固定路徑。**而且這不限於刻意驗額度的場合。** 非 demo 的 bundle 一啟動，`TrayAnimator.start()`（`TrayAnimator.swift:180`）就無條件進入額度輪詢，走生產路徑的 `enrich_snapshot`（`agent_usage.rs:1504`）把觀測寫進那份固定路徑的 store。所以**任何**非 demo 的本機 bundle 驗收都在寫使用者的正式歷史庫，連只看 Settings 或狀態列的也是。要嘛連那份 store 一起備份還原，要嘛改用 `--demo`。
+
+> 這條規則來自一次實際的假回歸。Codex 時間窗歷史卡的每一列都顯示零 token 與零金額，並印出「額度變動了 N%，但這台機器上沒有記錄到」，而同一台機器上安裝的 bundle 顯示正常；當時 engine pin 剛推進過，於是看起來像那次推進造成的回歸。實際鏈條與 engine 無關：`tokenbar.usage.attribution.confirmed` 在兩個網域的內容不同，受測 client 在 bundle 網域有宣告、在行程名網域沒有，於是 `UsageAttribution.resolve` 回 `.unassigned`，`QuotaHistory.swift` 的 `spanTotals` 歸屬閘門把該 span 的每一則訊息都跳過，`spanTokens` 與 `spanCost` 皆為 0，`WindowEquivalence.aggregate` 因此回 `.unaccounted`。週期本身讀固定路徑的 `quota-pace-history-v3.json`，不受網域影響，所以列仍在——這正是它看起來像資料缺失而非組態差異的原因。
+
+> 同時排除掉的方向，記下來避免重查：推進前後兩個 engine pin 對同一批 span 回傳位元相同的訊息數與 token 總量，隔離快取也不改變結果——該鏈條不經過 `UsageAttribution`。
+
+> **不要**讓裸執行檔改讀 `UserDefaults(suiteName: "com.nyanako.tokenbar")` 來迴避這件事：那會讓開發執行檔寫進使用者正式的偏好網域，摧毀 `SELFTEST_BUNDLE_ID` 建立的隔離。
+
+不需要 `.app` bundle 語意、且不依賴 `UserDefaults` 的人工 UI 檢查，優先從 repository root 執行 `swift run TokenBar --open-popover`。需要 `make bundle` 產生的 `dist/TokenBar.app` 的有兩類：一是 icon、`Info.plist`、`LSUIElement`、Sparkle、autostart 或安裝路徑等 bundle-only 行為；二是**任何由偏好驅動的畫面**（usage attribution、Settings 持久化、狀態列項目狀態），且必須照上方網域警告的備份還原程序走。以 Argument Domain 注入初始偏好的 deterministic 檢查**不需要備份還原**，因為它們跑在裸執行檔上、只碰 `TokenBar` 網域，動不到使用者正式的偏好。但**不要以為它們因此就與既有網域無關**：Argument Domain 只覆寫命令列傳進去的鍵，其餘一律往下落到 application domain。例如 `SettingsWindowView.swift:56` 讀 `tokenbar.tabs.hidden`，而下方那組指令沒有注入它，於是開發過程累積在 `TokenBar` 網域的舊值會改變你看到的列。這類檢查的 deterministic 只在「該畫面的每一個輸入都被注入」時成立；做不到就先 `defaults delete TokenBar` 清掉再跑。
 
 Provider quota pace 以 `swift run TokenBar --demo --open-popover` 提供 deterministic 人工驗收面；snapshot badge 明示 `FIXTURE`，且 `DemoUsageDataSource` 不呼叫 live FFI、不讀寫 quota cache。Historical／Linear／Off 都要實際呈現；驗收時必須區分低 remaining 觸發的 quota 長條黃／紅健康色，與 deficit stage 觸發的 pace marker／footer 橘色。橘色只看 actual 有沒有越過 expected 線，不看是哪個 estimator 畫出那條線——Historical 與 Linear 的 deficit 同色，狀態文案仍必須分辨兩者。舊規則（只有 `available` 可上色）已廢止：`available` 由每次 refresh 重跑的 out-of-sample fit gate 決定，同一張卡會在 Historical 與 `learningHistory` 之間來回，把顏色綁在 basis 上會讓使用者看到預測「一下子就不見了」，而底層 deficit 其實一直存在。
 
@@ -158,8 +198,8 @@ swift run TokenBar --demo --settings \
 
 | UX surface | Preferred path | Completion evidence |
 |---|---|---|
-| Popover、lens、keyboard、scroll、appearance | `swift run TokenBar --open-popover` | 實際操作與必要截圖；結束測試 process |
-| Individual client status items | `--demo --settings`配合兩個M2 Argument Domain keys驗initial visual state；本機資料、placement／right-click／跨螢幕則用同一`dist/TokenBar.app` | 預設只有主item；switch點擊後立即以`.mini`原生狀態更新，client shell可稍後於同一defaults reconciliation建立但不得阻塞control setter；Settings body重建不得同步呼叫`SMAppService.status`（本機量測單次約0.5～0.9秒），關閉／重開與連續toggle都須維持可互動；enable／disable／hide／restore保留selection與`tokenbar-client-<id>` placement；`antigravity-cli`在本機error-only provider狀態仍可配置；dashboard選定單一年份時，Settings仍以all-time graph保留所有live client item rows並可停用；client A→B沿用同一popover並各自恢復本次app session停留的lens；主item恢復自己的client-plus-lens route，不被individual item覆寫；主item right-click仍只改global source；1x／2x雙向移動圖示清晰；VoiceOver label不含raw card／error，explicit error fallback固定讀作last-known而非current quota；0與8 items的idle profile沒有per-client loop |
+| Popover、lens、keyboard、scroll、appearance | `swift run TokenBar --open-popover`；但 lens 記憶與 appearance 的互動寫入是偏好驅動的，那部分依上方網域警告改用 bundle 加備份還原 | 實際操作與必要截圖；結束測試 process |
+| Individual client status items | `--demo --settings`配合兩個M2 Argument Domain keys驗initial visual state；本機資料、placement／right-click／跨螢幕則用同一`dist/TokenBar.app`（placement 記憶存在 app 自己的偏好網域，依上方網域警告備份還原，不要換 identifier——換了等於記憶歸零） | 預設只有主item；switch點擊後立即以`.mini`原生狀態更新，client shell可稍後於同一defaults reconciliation建立但不得阻塞control setter；Settings body重建不得同步呼叫`SMAppService.status`（本機量測單次約0.5～0.9秒），關閉／重開與連續toggle都須維持可互動；enable／disable／hide／restore保留selection與`tokenbar-client-<id>` placement；`antigravity-cli`在本機error-only provider狀態仍可配置；dashboard選定單一年份時，Settings仍以all-time graph保留所有live client item rows並可停用；client A→B沿用同一popover並各自恢復本次app session停留的lens；主item恢復自己的client-plus-lens route，不被individual item覆寫；主item right-click仍只改global source；1x／2x雙向移動圖示清晰；VoiceOver label不含raw card／error，explicit error fallback固定讀作last-known而非current quota；0與8 items的idle profile沒有per-client loop |
 | Icon、bundle identity、Sparkle、autostart | `make bundle` 後啟動 `dist/TokenBar.app` | 記錄 bundle-only 行為；完成後 unregister 並移除本機 bundle |
 | Homebrew、Sparkle stable update、正式安裝路徑 | `/Applications/TokenBar.app` | 不以 `dist/TokenBar.app` 代替 installed-app 驗收 |
 
@@ -173,6 +213,7 @@ LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchS
 test -e "$ROOT/dist/.metadata_never_index"
 "$LSREGISTER" -u "$LOCAL_APP" 2>/dev/null || true
 rm -rf -- "$LOCAL_APP"
+
 ```
 
 清理後，Spotlight 與 LaunchServices 查詢都不應再列出 repository 的 `dist/TokenBar.app`；正常情況只保留 `/Applications/TokenBar.app`：
@@ -235,7 +276,7 @@ Mutation qualification is thirteen compile-preserving changes: four independent 
 
 ## Cross-port fixture cross-check
 
-Windows port（[Nanako0129/TokenBar-Windows](https://github.com/Nanako0129/TokenBar-Windows)）的 C# `TokenBar.Core` 是 `Sources/TokenBarCore` 的逐檔移植。Native reviewed pin 為 `3eec58460543e6238785de2b19a13205b1ddcb05`；Windows current pin 與 consumer state 由 Windows repo 自己擁有，Native 不重述。這次 consumer 是 pin-only：`crates/tb_core_ffi` 零改動（新欄位的填值在前次推進就做完了），也沒有 app-owned C ABI 變更隨行，`ctb.h` 簽名不變，故 Windows 不是本次簽名規則下的必須通知消費者。Windows 推進自己的 pin 時仍需要那一行填值，因為它的 `TokenBreakdown` literal 同樣是窮盡的。（本次 `8a88602` → `3eec584` delta 為 2 個 engine commit；前次 `02c883d` → `8a88602` 為 4 個。更早的推進依序為 `65511b8` → `02c883d` 的 4 commit、`044153f` → `65511b8` 的 4 commit、`ffe5a2d` → `044153f` 的 7 commit、`47c7241` → `ffe5a2d` 的 10 commit、`434b95ff` → `47c7241` 的 52 commit。`crates/tb_core_ffi` 只在 `044153f` → `65511b8` 那次動過一行。）LocalOnly、CostCoverage、embedded-cost 與 partial-estimation 語意尚未宣稱已經 C ABI 抵達 Swift。本次推進 global cache format、serialized layout 與所有 `parser_version` **全部不變**，因此不觸發任何重掃或遷移。前次推進動的是 `parser_version(Claude)` 3→4（只讓 Claude shard 重新 parse），再前次才是 `CACHE_FORMAT_VERSION` 3→4 那一次 format bump。Parser consequence：本次推進**動到 parser 輸出**——`parser_version(Codex)` 5→6，既有 Codex shard 全數轉冷重掃一次，其他 client 的快取不受影響；global cache format 與 serialized layout 不變（`CACHE_FORMAT_VERSION` 維持 4），因此沒有遷移。前次推進則是 parser 與 cache schema 皆不動的定價修正，再前次動的是 `parser_version(Claude)` 3→4，更前次才是 `CACHE_FORMAT_VERSION` 3→4 那一次 format bump。
+Windows port（[Nanako0129/TokenBar-Windows](https://github.com/Nanako0129/TokenBar-Windows)）的 C# `TokenBar.Core` 是 `Sources/TokenBarCore` 的逐檔移植。Native reviewed pin 為 `3eec58460543e6238785de2b19a13205b1ddcb05`；Windows current pin 與 consumer state 由 Windows repo 自己擁有，Native 不重述。這次 consumer 是 pin-only：`crates/tb_core_ffi` 零改動（新欄位的填值在前次推進就做完了），也沒有 app-owned C ABI 變更隨行，`ctb.h` 簽名不變，故 Windows 不是本次簽名規則下的必須通知消費者。Windows 推進自己的 pin 時仍需要那一行填值，因為它的 `TokenBreakdown` literal 同樣是窮盡的；該行現在填 `cache_write_1h: entry.cache_write` 而非 `0`（TokenBar PR #309，理由與 false-positive 證據見 [`vendor-tokscale.md`](vendor-tokscale.md)）。（本次 `8a88602` → `3eec584` delta 為 2 個 engine commit；前次 `02c883d` → `8a88602` 為 4 個。更早的推進依序為 `65511b8` → `02c883d` 的 4 commit、`044153f` → `65511b8` 的 4 commit、`ffe5a2d` → `044153f` 的 7 commit、`47c7241` → `ffe5a2d` 的 10 commit、`434b95ff` → `47c7241` 的 52 commit。`crates/tb_core_ffi` 只在 `044153f` → `65511b8` 那次動過一行。）LocalOnly、CostCoverage、embedded-cost 與 partial-estimation 語意尚未宣稱已經 C ABI 抵達 Swift。本次推進 global cache format、serialized layout 與所有 `parser_version` **全部不變**，因此不觸發任何重掃或遷移。前次推進動的是 `parser_version(Claude)` 3→4（只讓 Claude shard 重新 parse），再前次才是 `CACHE_FORMAT_VERSION` 3→4 那一次 format bump。Parser consequence：本次推進**動到 parser 輸出**——`parser_version(Codex)` 5→6，既有 Codex shard 全數轉冷重掃一次，其他 client 的快取不受影響；global cache format 與 serialized layout 不變（`CACHE_FORMAT_VERSION` 維持 4），因此沒有遷移。前次推進則是 parser 與 cache schema 皆不動的定價修正，再前次動的是 `parser_version(Claude)` 3→4，更前次才是 `CACHE_FORMAT_VERSION` 3→4 那一次 format bump。
 
 本次 pin 帶進 **Codex 互動（turn）計數修正**（engine PR #26）。turn 偵測只認 `event_msg` 的 `user_message` 這一種人類輸入載體，而 Codex 約自 0.145 起改以 `event_msg` 的 `item_completed` 攜帶 `type` 為 `"UserMessage"` 的 `item` 回報同一段輸入，於是近期 transcript 的 `is_turn_start` 從未被設起、Daily 與 Monthly 的 Codex 互動幾乎全為 0。此修正**動到 parser 輸出**：`parser_version(Codex)` 5→6，既有 Codex shard 全數轉冷重掃一次，其他 client 的快取不受影響；`CACHE_FORMAT_VERSION` 維持 4，序列化 layout 與 resume state 不變，因此沒有遷移。⚠️ **既有使用者升級後**會看到 Codex 首次掃描明顯變慢，以及歷史 Codex 互動由 0 跳到數千。實測 2,407 份 rollout：turn 由 25 升至 5,374，而 tokens 11,622,513,995、成本 $8,146.080494、messages 91,741 在全部 114 天逐日位元相同——動的只有 turn 欄位。本次 consumer 是 pin-only，`crates/tb_core_ffi` 零改動、`ctb.h` 簽名不變。
 

@@ -19,6 +19,8 @@ mod agent_antigravity;
 mod agent_copilot;
 mod agent_grok;
 mod agent_grokbot;
+mod agent_kiro;
+mod agent_opencode_go;
 mod agent_quota_duration;
 mod agent_quota_history;
 #[cfg(target_os = "windows")]
@@ -29,6 +31,7 @@ mod claude_config_dirs;
 mod extra_scan_paths;
 mod filter_parity_probe;
 mod hourly_report;
+mod kiro_integrations;
 #[cfg(target_os = "macos")]
 mod macos_safe_storage;
 mod window_usage;
